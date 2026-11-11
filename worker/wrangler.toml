@@ -6,7 +6,7 @@ workers_dev = true
 [[d1_databases]]
 binding = "DB"
 database_name = "go7-gov-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "b0a981cf-e0b1-417c-981f-805997d76f66"
 migrations_dir = "migrations"
 
 [triggers]

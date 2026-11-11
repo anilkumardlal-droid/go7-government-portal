@@ -4,142 +4,695 @@ const CATEGORIES = [
   ["exam-calendar","Exam Calendar"],["scholarships","Scholarships"],
   ["state-jobs","State Jobs"],["other","Other Updates"]
 ];
+
 const CATEGORY_SET = new Set(CATEGORIES.map(x=>x[0]));
+
+function detectCategory(title = "", summary = "") {
+  const text = `${title} ${summary}`
+    .toLowerCase()
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const rules = [
+    ["answer-keys", /\b(answer\s*keys?|provisional answer|final answer key)\b/],
+    ["admit-cards", /\b(admit\s*cards?|hall tickets?|call letters?|e-admit|download admit)\b/],
+    ["results", /\b(results?|merit\s*lists?|score\s*cards?|scorecards?|cut[- ]?offs?|qualified candidates|selection lists?|short[- ]?listed candidates|shortlisted candidates|selected candidates|final selection list)\b/],
+    ["scholarships", /\b(scholarships?|fellowships?|stipend schemes?)\b/],
+    ["admissions", /\b(admissions?|entrance applications?|enrolments?|enrollments?|counselling|counseling|seat allotment|university applications?)\b/],
+    ["syllabus", /\b(syllabus|exam patterns?)\b/],
+    ["exam-calendar", /\b(exam calendars?|examination schedules?|exam dates?|time tables?|timetables?)\b/]
+  ];
+  for (const [category, pattern] of rules) if (pattern.test(text)) return category;
+
+  const stateTerms = /\b(state government|state-wise|state jobs|government of (uttar pradesh|bihar|gujarat|rajasthan|maharashtra|jharkhand|haryana|punjab|kerala|karnataka|assam|odisha|telangana|andhra pradesh|west bengal|tamil nadu|madhya pradesh|chhattisgarh|uttarakhand|himachal pradesh)|dsssb|delhi subordinate services selection board)\b/i;
+  const jobTerms = /\b(recruitment|vacanc(y|ies)|apprentice|appointment|hiring|apply online|posts?|jobs?|filling up|vacant posts?|vacancy circular|empanelment|walk[- ]?in|engagement|career|applications invited|invites applications|deputation basis|contract basis|employment notice|employment notification)\b/i;
+  if (stateTerms.test(text) && jobTerms.test(text)) return "state-jobs";
+  if (jobTerms.test(text)) return "latest-jobs";
+  return "other";
+}
+
+function isOfficialHost(hostname) {
+  const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
+  return host.endsWith(".gov.in") || host.endsWith(".nic.in") || host.endsWith(".ac.in") || host.endsWith(".edu.in");
+}
+
+function isUsefulNoticeTitle(title) {
+  const value = clean(title, 220).toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (value.length < 16) return false;
+  return !/^(download )?(admit card|hall ticket|notice|notification|recruitment|advertisement|click here|read more|latest update|important notice)$/.test(value);
+}
+
 const json = (data,status=200,origin="*") => new Response(JSON.stringify(data),{
-  status,headers:{"content-type":"application/json; charset=utf-8","access-control-allow-origin":origin,
-  "access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"Content-Type,Authorization"}
+  status,
+  headers:{
+    "content-type":"application/json; charset=utf-8",
+    "access-control-allow-origin":origin,
+    "access-control-allow-methods":"GET,POST,OPTIONS",
+    "access-control-allow-headers":"Content-Type,Authorization"
+  }
 });
-const clean = (s,max=500) => String(s||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,max);
-const decode = s => String(s||"").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
+
+const clean = (s,max=500) => String(s||"")
+  .replace(/<[^>]*>/g," ")
+  .replace(/\s+/g," ").trim().slice(0,max);
+
+const decode = s => String(s||"")
+  .replace(/&amp;/g,"&")
+  .replace(/&lt;/g,"<")
+  .replace(/&gt;/g,">")
+  .replace(/&quot;/g,'"')
+  .replace(/&#39;|&apos;/g,"'")
+  .replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
+
 function tagValue(block,names){
   for(const name of names){
     const re=new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,"i");
-    const m=block.match(re); if(m) return decode(m[1].replace(/<!\[CDATA\[|\]\]>/g,""));
+    const m=block.match(re);
+    if(m) return decode(m[1].replace(/<!\[CDATA\[|\]\]>/g,""));
   }
   return "";
 }
+
 function attrValue(block,tag,attr){
-  const re=new RegExp(`<${tag}\\b([^>]*)>`,"i"), m=block.match(re); if(!m)return "";
-  const a=m[1].match(new RegExp(`${attr}=["']([^"']+)["']`,"i")); return a?decode(a[1]):"";
+  const re=new RegExp(`<${tag}\\b([^>]*)>`,"i");
+  const m=block.match(re);
+  if(!m)return "";
+  const a=m[1].match(new RegExp(`${attr}=["']([^"']+)["']`,"i"));
+  return a?decode(a[1]):"";
 }
+
 function parseFeed(xml,source){
   const entries=[];
   const blocks=[...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].map(x=>x[0]);
+
   for(const b of blocks){
     const title=clean(tagValue(b,["title"]),220);
     let link=tagValue(b,["link"]);
+
     if(!link) link=attrValue(b,"link","href");
     if(!link) link=tagValue(b,["guid","id"]);
+
     const guid=clean(tagValue(b,["guid","id"]),500)||link||title;
     const summary=clean(tagValue(b,["description","summary","content:encoded","content"]),360);
     const date=tagValue(b,["pubDate","published","updated","dc:date"]);
-    if(title && safeHttpUrl(link)) entries.push({title,link,guid,summary,publishedAt:validDate(date)});
+
+    if(title && safeHttpUrl(link)){
+      entries.push({
+        title,
+        link,
+        guid,
+        summary,
+        publishedAt:validDate(date)
+      });
+    }
   }
   return entries;
 }
-function validDate(s){if(!s)return null;const d=new Date(s);return Number.isNaN(d.getTime())?null:d.toISOString();}
-function safeHttpUrl(value){
-  try{const u=new URL(value);return ["http:","https:"].includes(u.protocol)&&!u.username&&!u.password;}
-  catch{return false;}
+
+function validDate(s){
+  if(!s)return null;
+  const d=new Date(s);
+  return Number.isNaN(d.getTime())?null:d.toISOString();
 }
+
+function safeHttpUrl(value){
+  try{
+    const u=new URL(value);
+    return ["http:","https:"].includes(u.protocol)&&!u.username&&!u.password;
+  }catch{
+    return false;
+  }
+}
+
 async function validateFeedUrl(value){
-  if(!safeHttpUrl(value))throw new Error("Feed URL must be a valid HTTP(S) URL.");
+  if(!safeHttpUrl(value)){
+    throw new Error("Feed URL must be a valid HTTP(S) URL.");
+  }
+
   const u=new URL(value);
   const host=u.hostname.toLowerCase();
-  if(host==="localhost"||host==="127.0.0.1"||host==="::1"||host.endsWith(".local")||
-     /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host))
+
+  if(!isOfficialHost(host)){
+    throw new Error("Only official government / public-institution domains (.gov.in, .nic.in, .ac.in, .edu.in) are accepted.");
+  }
+
+  if(host==="localhost"||host==="127.0.0.1"||host==="::1"||
+     host.endsWith(".local")||
+     /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)){
     throw new Error("Private/local feed hosts are not allowed.");
+  }
+
   return u.toString();
 }
-function auth(req,env){return Boolean(env.ADMIN_TOKEN)&&req.headers.get("authorization")==="Bearer "+env.ADMIN_TOKEN;}
-async function fetchFeed(source,env){
-  const res=await fetch(source.feed_url,{headers:{"User-Agent":"GO7-GovUpdates/1.0 (+https://jobs.go7.in)","Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml"},redirect:"follow",signal:AbortSignal.timeout(12000)});
-  if(!res.ok)throw new Error(`HTTP ${res.status}`);
-  const type=res.headers.get("content-type")||"";
-  const text=await res.text();
-  if(text.length>1_500_000)throw new Error("Feed exceeds 1.5 MB limit");
-  if(!/xml|rss|atom|text\/plain/i.test(type)&&!/<(rss|feed|rdf:RDF)\b/i.test(text.slice(0,1000)))throw new Error("Response does not look like RSS/Atom XML");
-  return parseFeed(text,source).slice(0,Math.max(1,Math.min(50,Number(env.MAX_ITEMS_PER_FEED)||25)));
+
+function auth(req,env){
+  return Boolean(env.ADMIN_TOKEN)&&
+    req.headers.get("authorization")==="Bearer "+env.ADMIN_TOKEN;
 }
+
+/* RSS FETCH */
+async function fetchFeed(source,env){
+  const feedUrl=await validateFeedUrl(source.feed_url);
+
+  const res=await fetch(feedUrl,{
+    method:"GET",
+    headers:{
+      "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+      "Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+      "Accept-Language":"en-US,en;q=0.9",
+      "Cache-Control":"no-cache"
+    },
+    redirect:"follow",
+    signal:AbortSignal.timeout(12000)
+  });
+
+  const type=res.headers.get("content-type")||"";
+  const finalUrl = res.url || feedUrl;
+  if (!safeHttpUrl(finalUrl) || !isOfficialHost(new URL(finalUrl).hostname)) {
+    throw new Error("Feed redirected outside an approved official domain.");
+  }
+  const text=await res.text();
+
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  if(text.length>1500000) throw new Error("Feed exceeds 1.5 MB limit");
+
+  if(!/xml|rss|atom|text\/plain/i.test(type)&&
+     !/<(rss|feed|rdf:RDF)\b/i.test(text.slice(0,1000))){
+    throw new Error("Response does not look like RSS/Atom XML");
+  }
+
+  const parsed = parseFeed(text,source);
+  return parsed.filter(item => {
+    try { return isOfficialHost(new URL(item.link).hostname) && isUsefulNoticeTitle(item.title); }
+    catch { return false; }
+  }).slice(0, Math.max(1, Math.min(50, Number(env.MAX_ITEMS_PER_FEED) || 25)));
+}
+
+
+// Official government recruitment pages
+const OFFICIAL_MONITORS = [
+  {
+    name:"UPSC Official Recruitment",
+    category:"latest-jobs",
+    urls:[
+      "https://www.upsc.gov.in/recruitment/recruitment-advertisement",
+      "https://cms.upsc.gov.in/archived-advertisements/"
+    ],
+    hosts:["www.upsc.gov.in","upsc.gov.in","cms.upsc.gov.in"]
+  },
+  {
+    name:"SSC Official Notices",
+    category:"latest-jobs",
+    urls:[
+      "https://ssc.gov.in/",
+      "https://ssccr.gov.in/announcements"
+    ],
+    hosts:["ssc.gov.in","www.ssc.gov.in","ssccr.gov.in"]
+  },
+  {
+    name:"Railway RRB Employment Notices",
+    category:"latest-jobs",
+    urls:[
+      "https://www.rrbcdg.gov.in/employment-notices.php",
+      "https://rrbahmedabad.gov.in/exams/"
+    ],
+    hosts:[
+      "www.rrbcdg.gov.in",
+      "rrbcdg.gov.in",
+      "rrbahmedabad.gov.in"
+    ]
+  }
+];
+
+const RECRUITMENT_RE =
+  /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application form|applications invited|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit card|hall ticket|answer key|result|merit list|exam date|exam schedule|apprentice)\b/i;
+
+const IGNORE_RE =
+  /\b(tender|procurement|quotation|annual report|press release|meeting|photo gallery|celebration|e[-\s]?auction)\b/i;
+
+
+function extractOfficialLinks(html,pageUrl,monitor){
+  const out=[];
+  const seen=new Set();
+
+  const anchors=html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi)||[];
+
+  for(const a of anchors){
+    const hm=a.match(/\bhref\s*=\s*(["'])(.*?)\1/i);
+    if(!hm)continue;
+
+    const title=clean(decode(a.replace(/<[^>]*>/g," ")),220);
+
+    if(title.length<8||
+       !RECRUITMENT_RE.test(title)||
+       IGNORE_RE.test(title))continue;
+
+    let target;
+
+    try{
+      target=new URL(decode(hm[2]),pageUrl);
+    }catch{
+      continue;
+    }
+
+    if(!/^https?:$/.test(target.protocol)||
+       !monitor.hosts.includes(target.hostname.toLowerCase()))continue;
+
+    if(target.pathname==="/"||
+       target.href===pageUrl||
+       seen.has(target.href))continue;
+
+    seen.add(target.href);
+    out.push({title,link:target.href});
+
+    if(out.length>=12)break;
+  }
+
+  return out;
+}
+
+
+async function fetchOfficialMonitor(monitor){
+  const failures=[];
+
+  for(const pageUrl of monitor.urls){
+    try{
+      const response=await fetch(pageUrl,{
+        method:"GET",
+        redirect:"follow",
+        headers:{
+          "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language":"en-IN,en;q=0.9"
+        },
+        signal:AbortSignal.timeout(7000)
+      });
+
+      if(!response.ok){
+        failures.push(
+          `${new URL(pageUrl).hostname}: HTTP ${response.status}`
+        );
+        continue;
+      }
+
+      const html=await response.text();
+
+      if(html.length>2500000){
+        failures.push("Page too large");
+        continue;
+      }
+
+      const entries=extractOfficialLinks(html,pageUrl,monitor);
+
+if(entries.length){
+  return {
+    entries,
+    checkedUrl:pageUrl,
+    error:null
+  };
+}
+
+failures.push(
+  `${new URL(pageUrl).hostname}: no matching notice links found`
+);
+
+    }catch(e){
+      failures.push(
+        `${new URL(pageUrl).hostname}: ${
+          e.name==="TimeoutError"?"timeout":clean(e.message,100)
+        }`
+      );
+    }
+  }
+
+  return {
+    entries:[],
+    checkedUrl:null,
+    error:failures.join("; ")||"No official page could be fetched"
+  };
+}
+
+
+async function syncOfficialMonitors(db){
+  let inserted=0;
+  let skipped=0;
+  const errors=[];
+
+  const results=await Promise.all(
+    OFFICIAL_MONITORS.map(m=>fetchOfficialMonitor(m))
+  );
+
+  for(let i=0;i<OFFICIAL_MONITORS.length;i++){
+    const monitor=OFFICIAL_MONITORS[i];
+    const result=results[i];
+
+    if(result.error){
+      errors.push(`${monitor.name}: ${result.error}`);
+      continue;
+    }
+
+    for(const item of result.entries){
+      const guid=("official-page|"+item.link).slice(0,900);
+
+      const fingerprint = guid;
+      const write=await db.prepare(`
+        INSERT OR IGNORE INTO review_items
+        (fingerprint,title,summary,category,source_name,source_url,status)
+        VALUES(?,?, '', ?,?,?, 'pending')
+      `).bind(
+        fingerprint,
+        item.title,
+        detectCategory(item.title, ""),
+        monitor.name,
+        item.link
+      ).run();
+
+      if(write.meta?.changes)inserted++;
+      else skipped++;
+    }
+  }
+
+  return {
+    checked:OFFICIAL_MONITORS.length,
+    inserted,
+    skipped,
+    errors
+  };
+}
+
+/* MAIN SYNC SYSTEM */
+
 async function syncAll(env){
-  const sources=await env.DB.prepare("SELECT * FROM sources WHERE active=1").all();
-  let inserted=0,skipped=0;const errors=[];
+  const sources=await env.DB.prepare(
+    "SELECT * FROM sources WHERE active=1"
+  ).all();
+
+  let rssInserted=0;
+  let rssSkipped=0;
+  const errors=[];
+
+  // 1. RSS feeds sync
   for(const source of sources.results||[]){
     try{
       const entries=await fetchFeed(source,env);
+
       for(const item of entries){
         const guid=(source.feed_url+"|"+item.guid).slice(0,900);
-        const result=await env.DB.prepare(`INSERT OR IGNORE INTO posts
+
+        const duplicate = await env.DB.prepare(
+          "SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1"
+        ).bind(item.title).first();
+        if (duplicate) { rssSkipped++; continue; }
+
+        const result=await env.DB.prepare(`
+          INSERT OR IGNORE INTO posts
           (guid,title,summary,category,source_name,source_url,published_at,status)
-          VALUES(?,?,?,?,?,?,?,'published')`)
-          .bind(guid,item.title,item.summary,source.category,source.name,item.link,item.publishedAt).run();
-        if(result.meta?.changes)inserted++;else skipped++;
+          VALUES(?,?,?,?,?,?,?,'published')
+        `).bind(
+          guid,
+          item.title,
+          item.summary,
+          detectCategory(item.title,item.summary),
+          source.name,
+          item.link,
+          item.publishedAt
+        ).run();
+
+        if(result.meta?.changes)rssInserted++;
+        else rssSkipped++;
       }
-      await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
-    }catch(e){errors.push(`${source.name}: ${e.message}`);}
+
+      await env.DB.prepare(
+        "UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?"
+      ).bind(source.id).run();
+
+    }catch(e){
+      errors.push(`${source.name}: ${clean(e.message,180)}`);
+    }
   }
-  return {sources_checked:sources.results?.length||0,inserted,skipped,errors};
+
+  // 2. Official website monitoring
+  let officialResult={
+    checked:0,
+    inserted:0,
+    skipped:0,
+    errors:[]
+  };
+
+  try{
+    officialResult=await syncOfficialMonitors(env.DB);
+    errors.push(...officialResult.errors);
+  }catch(e){
+    errors.push("Official monitoring: "+clean(e.message,180));
+  }
+
+  const pendingCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM review_items WHERE status='pending'").first();
+
+  return {
+    sources_checked:(sources.results?.length||0)+officialResult.checked,
+    review_pending:pendingCount?.total||0,
+
+    rss:{
+      inserted:rssInserted,
+      skipped:rssSkipped
+    },
+
+    official:{
+      checked:officialResult.checked,
+      inserted:officialResult.inserted,
+      skipped:officialResult.skipped
+    },
+
+    inserted:rssInserted+officialResult.inserted,
+    skipped:rssSkipped+officialResult.skipped,
+    errors
+  };
 }
+
+/* WORKER API */
+
 export default {
   async fetch(request,env,ctx){
     const origin=request.headers.get("Origin")||"";
     const allowed=env.ALLOWED_ORIGIN||"https://jobs.go7.in";
     const corsOrigin=origin===allowed?allowed:allowed;
-    if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{
-      "access-control-allow-origin":corsOrigin,"access-control-allow-methods":"GET,POST,OPTIONS",
-      "access-control-allow-headers":"Content-Type,Authorization","access-control-max-age":"86400"}});
-    const url=new URL(request.url),path=url.pathname;
+
+    if(request.method==="OPTIONS"){
+      return new Response(null,{
+        status:204,
+        headers:{
+          "access-control-allow-origin":corsOrigin,
+          "access-control-allow-methods":"GET,POST,OPTIONS",
+          "access-control-allow-headers":"Content-Type,Authorization",
+          "access-control-max-age":"86400"
+        }
+      });
+    }
+
+    const url=new URL(request.url);
+    const path=url.pathname;
+
     try{
-      if(path==="/api/health")return json({ok:true,service:"GO7 Government API"},200,corsOrigin);
-      if(path==="/api/categories")return json({categories:CATEGORIES.map(([id,label])=>({id,label}))},200,corsOrigin);
-      const detailMatch=path.match(/^\/api\/posts\/(\d+)$/);
-      if(detailMatch&&request.method==="GET"){
-        const post=await env.DB.prepare("SELECT id,title,summary,category,source_name,source_url,published_at,created_at FROM posts WHERE id=? AND status='published'").bind(Number(detailMatch[1])).first();
-        if(!post)return json({error:"Post not found"},404,corsOrigin);
-        const labelMap=Object.fromEntries(CATEGORIES);
-        return json({post:{...post,category_label:labelMap[post.category]||post.category}},200,corsOrigin);
+      if(path==="/"){
+        return json({ok:true,service:"GO7 Government API",health:"/api/health",categories:"/api/categories"},200,corsOrigin);
       }
+
+      if(path==="/api/health"){
+        return json({
+          ok:true,
+          service:"GO7 Government API"
+        },200,corsOrigin);
+      }
+
+      if(path==="/api/categories"){
+        return json({
+          categories:CATEGORIES.map(([id,label])=>({id,label}))
+        },200,corsOrigin);
+      }
+
+      const detailMatch=path.match(/^\/api\/posts\/(\d+)$/);
+
+      if(detailMatch&&request.method==="GET"){
+        const post=await env.DB.prepare(
+          "SELECT id,title,summary,category,source_name,source_url,published_at,created_at FROM posts WHERE id=? AND status='published'"
+        ).bind(Number(detailMatch[1])).first();
+
+        if(!post){
+          return json({error:"Post not found"},404,corsOrigin);
+        }
+
+        const labelMap=Object.fromEntries(CATEGORIES);
+
+        return json({
+          post:{
+            ...post,
+            category_label:labelMap[post.category]||post.category
+          }
+        },200,corsOrigin);
+      }
+
       if(path==="/api/posts"&&request.method==="GET"){
         const limit=Math.max(1,Math.min(50,Number(url.searchParams.get("limit"))||20));
         const offset=Math.max(0,Number(url.searchParams.get("offset"))||0);
         const category=url.searchParams.get("category")||"";
         const q=(url.searchParams.get("q")||"").trim().slice(0,100);
+
         let where="status='published'",params=[];
-        if(category&&CATEGORY_SET.has(category)){where+=" AND category=?";params.push(category);}
-        if(q){where+=" AND (title LIKE ? OR summary LIKE ? OR source_name LIKE ?)";params.push(`%${q}%`,`%${q}%`,`%${q}%`);}
-        const count=await env.DB.prepare(`SELECT COUNT(*) AS total FROM posts WHERE ${where}`).bind(...params).first();
-        const rows=await env.DB.prepare(`SELECT id,title,summary,category,source_name,source_url,published_at,created_at
-          FROM posts WHERE ${where} ORDER BY COALESCE(published_at,created_at) DESC LIMIT ? OFFSET ?`)
-          .bind(...params,limit,offset).all();
-        const labelMap=Object.fromEntries(CATEGORIES);
-        return json({posts:(rows.results||[]).map(p=>({...p,category_label:labelMap[p.category]||p.category})),
-          total:count?.total||0,has_more:offset+limit<(count?.total||0)},200,corsOrigin);
-      }
-      if(path.startsWith("/api/admin/")){
-        if(!auth(request,env))return json({error:"Unauthorized. Check your admin token."},401,corsOrigin);
-        if(path==="/api/admin/sources"&&request.method==="GET"){
-          const rows=await env.DB.prepare("SELECT id,name,feed_url,category,active,last_checked_at FROM sources ORDER BY id DESC").all();
-          return json({sources:rows.results||[]},200,corsOrigin);
+
+        if(category&&CATEGORY_SET.has(category)){
+          where+=" AND category=?";
+          params.push(category);
         }
+
+        if(q){
+          where+=" AND (title LIKE ? OR summary LIKE ? OR source_name LIKE ?)";
+          params.push(`%${q}%`,`%${q}%`,`%${q}%`);
+        }
+
+        const count=await env.DB.prepare(
+          `SELECT COUNT(*) AS total FROM posts WHERE ${where}`
+        ).bind(...params).first();
+
+        const rows=await env.DB.prepare(`
+          SELECT id,title,summary,category,source_name,source_url,published_at,created_at
+          FROM posts WHERE ${where}
+          ORDER BY COALESCE(published_at,created_at) DESC
+          LIMIT ? OFFSET ?
+        `).bind(...params,limit,offset).all();
+
+        const labelMap=Object.fromEntries(CATEGORIES);
+
+        return json({
+          posts:(rows.results||[]).map(p=>({
+            ...p,
+            category_label:labelMap[p.category]||p.category
+          })),
+          total:count?.total||0,
+          has_more:offset+limit<(count?.total||0)
+        },200,corsOrigin);
+      }
+
+      if(path.startsWith("/api/admin/")){
+        if(!auth(request,env)){
+          return json({
+            error:"Unauthorized. Check your admin token."
+          },401,corsOrigin);
+        }
+
+        if(path==="/api/admin/sources"&&request.method==="GET"){
+          const rows=await env.DB.prepare(
+            "SELECT id,name,feed_url,category,active,last_checked_at FROM sources ORDER BY id DESC"
+          ).all();
+
+          return json({
+            sources:rows.results||[]
+          },200,corsOrigin);
+        }
+
         if(path==="/api/admin/sources"&&request.method==="POST"){
           const body=await request.json();
-          const name=clean(body.name,100),category=String(body.category||"");
-          if(!name||!CATEGORY_SET.has(category))return json({error:"Enter a source name and valid category."},400,corsOrigin);
+          const name=clean(body.name,100);
+          const category=String(body.category||"");
+
+          if(!name||!CATEGORY_SET.has(category)){
+            return json({
+              error:"Enter a source name and valid category."
+            },400,corsOrigin);
+          }
+
           const feed=await validateFeedUrl(body.feed_url);
-          await env.DB.prepare("INSERT INTO sources(name,feed_url,category,active) VALUES(?,?,?,1)")
-            .bind(name,feed,category).run();
-          return json({ok:true,message:"Feed source added and enabled for automatic publishing."},201,corsOrigin);
+
+          await env.DB.prepare(
+            "INSERT INTO sources(name,feed_url,category,active) VALUES(?,?,?,1)"
+          ).bind(name,feed,category).run();
+
+          return json({
+            ok:true,
+            message:"Feed source added and enabled for automatic publishing."
+          },201,corsOrigin);
         }
+
+        if(path==="/api/admin/review"&&request.method==="GET"){
+          const rows=await env.DB.prepare(
+            "SELECT id,title,category,source_name,source_url,detected_at FROM review_items WHERE status='pending' ORDER BY detected_at DESC LIMIT 100"
+          ).all();
+          return json({items:rows.results||[]},200,corsOrigin);
+        }
+
+        const reviewMatch=path.match(/^\/api\/admin\/review\/(\d+)\/(approve|dismiss)$/);
+        if(reviewMatch&&request.method==="POST"){
+          const id=Number(reviewMatch[1]);
+          const action=reviewMatch[2];
+          const item=await env.DB.prepare(
+            "SELECT * FROM review_items WHERE id=? AND status='pending'"
+          ).bind(id).first();
+          if(!item) return json({error:"Review item not found or already processed."},404,corsOrigin);
+          if(action==="approve"){
+            let host="";
+            try{host=new URL(item.source_url).hostname;}catch{}
+            if(!isOfficialHost(host)||!isUsefulNoticeTitle(item.title)) return json({error:"Notice title or source link failed the official-source checks."},400,corsOrigin);
+            const duplicate=await env.DB.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+            if(!duplicate){
+              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status) VALUES(?,?,?, ?,?,?,NULL,'published')`)
+                .bind(item.fingerprint,item.title,item.summary||"",detectCategory(item.title,item.summary||""),item.source_name,item.source_url).run();
+            }
+            await env.DB.prepare("UPDATE review_items SET status='approved' WHERE id=?").bind(id).run();
+            return json({ok:true,message:duplicate?"Duplicate notice skipped; review item closed.":"Official notice approved and published."},200,corsOrigin);
+          }
+          await env.DB.prepare("UPDATE review_items SET status='dismissed' WHERE id=?").bind(id).run();
+          return json({ok:true,message:"Notice dismissed."},200,corsOrigin);
+        }
+
         if(path==="/api/admin/sync"&&request.method==="POST"){
           return json(await syncAll(env),200,corsOrigin);
         }
+
+        if(path==="/api/admin/reclassify"&&request.method==="POST"){
+          const rows=await env.DB.prepare(
+            "SELECT id,title,summary,category,source_url FROM posts"
+          ).all();
+
+          let changed=0;
+
+          for(const post of rows.results||[]){
+            const category=detectCategory(post.title,post.summary);
+            let officialLink=false;
+            try{officialLink=isOfficialHost(new URL(post.source_url).hostname);}catch{}
+            if(!isUsefulNoticeTitle(post.title)||!officialLink){
+              await env.DB.prepare("UPDATE posts SET status='hidden' WHERE id=?").bind(post.id).run();
+              changed++;
+              continue;
+            }
+
+            if(category!==post.category){
+              await env.DB.prepare(
+                "UPDATE posts SET category=? WHERE id=?"
+              ).bind(category,post.id).run();
+
+              changed++;
+            }
+          }
+
+          return json({
+            ok:true,
+            scanned:rows.results?.length||0,
+            updated:changed,
+            message:`Checked ${rows.results?.length||0} posts; updated ${changed} categories.`
+          },200,corsOrigin);
+        }
       }
+
       return json({error:"Not found"},404,corsOrigin);
+
     }catch(e){
-      return json({error:e.message||"Server error"},500,corsOrigin);
+      return json({
+        error:e.message||"Server error"
+      },500,corsOrigin);
     }
   },
+
   async scheduled(controller,env,ctx){
-    ctx.waitUntil(syncAll(env));
+    ctx.waitUntil(syncAll(env).catch(error => console.error("GO7 scheduled sync failed:", error)));
   }
 };

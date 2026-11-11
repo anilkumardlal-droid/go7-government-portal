@@ -1,4 +1,3 @@
-// Set this to the deployed Worker custom domain.
 window.GO7_CONFIG = {
-  API_BASE: "https://api.jobs.go7.in"
+  API_BASE: "https://go7-government-api.anilsrivastav561.workers.dev"
 };

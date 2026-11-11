@@ -9,17 +9,62 @@ async function call(path,method="GET",body){
   return data;
 }
 async function loadSources(){
-  try{const d=await call("/api/admin/sources");$("sources").innerHTML=(d.sources||[]).map(s=>`<div class="source-row"><b>${s.name}</b> · ${s.category} · ${s.active?"Active":"Paused"}<br><small>${s.feed_url}</small></div>`).join("")||"No sources added.";say("Sources loaded.");}
+  try{const d=await call("/api/admin/sources");$("sources").innerHTML=(d.sources||[]).map(s=>`<div class="source-row"><b>${escapeHtml(s.name)}</b> · ${escapeHtml(s.category)} · ${s.active?"Active":"Paused"}<br><small>${escapeHtml(s.feed_url)}</small></div>`).join("")||"No sources added.";say("RSS sources loaded.");}
   catch(e){say(e.message);}
 }
+function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+
 $("loadSources").onclick=loadSources;
 $("add").onclick=async()=>{
-  try{
-    const d=await call("/api/admin/sources","POST",{name:$("name").value.trim(),category:$("category").value,feed_url:$("feed").value.trim()});
-    say(d.message||"Source added.");$("name").value="";$("feed").value="";loadSources();
-  }catch(e){say(e.message);}
-};
-$("sync").onclick=async()=>{
-  try{say("Syncing feeds…");const d=await call("/api/admin/sync","POST",{});say(`Sync complete. Sources checked: ${d.sources_checked}. New posts: ${d.inserted}. Skipped: ${d.skipped}. Errors: ${d.errors.length}${d.errors.length?"\n"+d.errors.join("\n"):""}`);}
+  try{const d=await call("/api/admin/sources","POST",{name:$("name").value.trim(),category:$("category").value,feed_url:$("feed").value.trim()});say(d.message||"Source added.");$("name").value="";$("feed").value="";loadSources();}
   catch(e){say(e.message);}
 };
+
+$("sync").onclick = async () => {
+  try {
+    say("Syncing RSS feeds…");
+
+    const d = await call("/api/admin/sync", "POST", {});
+
+    say(
+      `Sync completed: ${d.sources_checked || 0} sources checked, ` +
+      `${d.inserted || 0} new posts, ` +
+      `${d.skipped || 0} already existing. ` +
+      `Pending official notices for review: ${d.review_pending || 0}. ` +
+      `Errors: ${(d.errors || []).join(" | ") || "None"}`
+    );
+
+  } catch (e) {
+    say("Sync failed: " + e.message);
+  }
+};
+
+$("reclassify").onclick=async()=>{
+  try{say("Checking existing posts and assigning categories…");const d=await call("/api/admin/reclassify","POST",{});say(d.message||`Checked ${d.scanned} posts; updated ${d.updated} categories.`)}
+  catch(e){say(e.message);}
+};
+
+
+async function loadReview(){
+  try{
+    const d=await call("/api/admin/review");
+    const items=d.items||[];
+    if(!items.length){$("review").textContent="No notices are waiting for review.";return;}
+    $("review").innerHTML=items.map(item=>`<div class="source-row"><b>${escapeHtml(item.title)}</b> · ${escapeHtml(item.category)}<br><small>${escapeHtml(item.source_name)} · ${escapeHtml(item.detected_at||"")}</small><br><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener">Open official notice</a><br><button type="button" data-approve="${item.id}" class="primary">Approve & publish</button> <button type="button" data-dismiss="${item.id}" class="secondary">Dismiss</button></div>`).join("");
+  }catch(e){say(e.message);}
+}
+
+$("loadReview").onclick=loadReview;
+$("review").addEventListener("click",async event=>{
+  const approve=event.target.closest("[data-approve]");
+  const dismiss=event.target.closest("[data-dismiss]");
+  const button=approve||dismiss;
+  if(!button)return;
+  const id=button.getAttribute(approve?"data-approve":"data-dismiss");
+  try{
+    const d=await call(`/api/admin/review/${id}/${approve?"approve":"dismiss"}`,"POST",{});
+    say(d.message||"Review updated.");
+    await loadReview();
+  }catch(e){say(e.message);}
+});
