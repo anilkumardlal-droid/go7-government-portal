@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 Disallow: /admin.html
+Disallow: /go7-owner-desk-7f3c9a/
 Sitemap: https://jobs.go7.in/sitemap.xml

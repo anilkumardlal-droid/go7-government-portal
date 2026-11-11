@@ -93,7 +93,7 @@ async function fetchCategory(category) {
   try {
     const query = new URLSearchParams({
       category,
-      limit: "8",
+      limit: "4",
       offset: "0"
     });
 
@@ -238,59 +238,7 @@ if ($("loadMore")) {
   });
 }
 
-// View all category links
-document.querySelectorAll(".info-panel .view-all").forEach((link) => {
-  link.addEventListener("click", () => {
-    const panel = link.closest(".info-panel");
-
-    if (!panel) return;
-
-    state.category = panel.dataset.category;
-    state.search = "";
-
-    if ($("searchInput")) {
-      $("searchInput").value = "";
-    }
-
-    if ($("feedTitle")) {
-      $("feedTitle").textContent =
-        panel.querySelector("h2")?.textContent || "Updates";
-    }
-
-    loadPosts();
-
-    document.querySelector("#latest")?.scrollIntoView({
-      behavior: "smooth"
-    });
-  });
-});
-
-// Quick category navigation
-document.querySelectorAll(".quick-links a").forEach((link) => {
-  link.addEventListener("click", () => {
-    const href = link.getAttribute("href") || "";
-
-    if (!href.startsWith("#")) return;
-
-    const panel = document.getElementById(href.slice(1));
-
-    if (!panel || !panel.dataset.category) return;
-
-    state.category = panel.dataset.category;
-    state.search = "";
-
-    if ($("searchInput")) {
-      $("searchInput").value = "";
-    }
-
-    if ($("feedTitle")) {
-      $("feedTitle").textContent =
-        panel.querySelector("h2")?.textContent || "Updates";
-    }
-
-    loadPosts();
-  });
-});
+// View More links intentionally navigate to dedicated category pages.
 
 // Mobile navigation
 const menuToggle = $("menuToggle");
