@@ -1,35 +1,27 @@
 const CATEGORIES = [
-  ["latest-jobs","Latest Jobs"],["results","Results"],["admit-cards","Admit Cards"],
-  ["answer-keys","Answer Keys"],["admissions","Admissions"],["syllabus","Syllabus"],
-  ["exam-calendar","Exam Calendar"],["scholarships","Scholarships"],
-  ["state-jobs","State Jobs"],["other","Other Updates"]
+  ["results","Results"], ["admit-cards","Admit Cards"], ["latest-jobs","Latest Jobs"],
+  ["answer-keys","Answer Key"], ["documents","Documents"], ["admissions","Admission"],
+  ["iti-jobs","10th/ITI Jobs"], ["outsourcing-jobs","Outsourcing Jobs"], ["syllabus","Syllabus"]
 ];
 
 const CATEGORY_SET = new Set(CATEGORIES.map(x=>x[0]));
 
 function detectCategory(title = "", summary = "") {
-  const text = `${title} ${summary}`
-    .toLowerCase()
-    .replace(/[\u2010-\u2015]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim();
-
+  const text = `${title} ${summary}`.toLowerCase().replace(/[\u2010-\u2015]/g,"-").replace(/\s+/g," ").trim();
   const rules = [
     ["answer-keys", /\b(answer\s*keys?|provisional answer|final answer key)\b/],
     ["admit-cards", /\b(admit\s*cards?|hall tickets?|call letters?|e-admit|download admit)\b/],
-    ["results", /\b(results?|merit\s*lists?|score\s*cards?|scorecards?|cut[- ]?offs?|qualified candidates|selection lists?|short[- ]?listed candidates|shortlisted candidates|selected candidates|final selection list)\b/],
-    ["scholarships", /\b(scholarships?|fellowships?|stipend schemes?)\b/],
+    ["results", /\b(results?|merit\s*lists?|score\s*cards?|cut[- ]?offs?|qualified candidates|selection lists?|selected candidates)\b/],
+    ["documents", /\b(document verification|certificate verification|document upload|important documents|correction window|photo|signature)\b/],
     ["admissions", /\b(admissions?|entrance applications?|enrolments?|enrollments?|counselling|counseling|seat allotment|university applications?)\b/],
     ["syllabus", /\b(syllabus|exam patterns?)\b/],
-    ["exam-calendar", /\b(exam calendars?|examination schedules?|exam dates?|time tables?|timetables?)\b/]
+    ["outsourcing-jobs", /\b(outsourc(?:e|ed|ing)|manpower|agency based|service provider)\b/],
+    ["iti-jobs", /\b(10th pass|class 10|matric|iti|industrial training institute|trade apprentice)\b/]
   ];
   for (const [category, pattern] of rules) if (pattern.test(text)) return category;
-
-  const stateTerms = /\b(state government|state-wise|state jobs|government of (uttar pradesh|bihar|gujarat|rajasthan|maharashtra|jharkhand|haryana|punjab|kerala|karnataka|assam|odisha|telangana|andhra pradesh|west bengal|tamil nadu|madhya pradesh|chhattisgarh|uttarakhand|himachal pradesh)|dsssb|delhi subordinate services selection board)\b/i;
-  const jobTerms = /\b(recruitment|vacanc(y|ies)|apprentice|appointment|hiring|apply online|posts?|jobs?|filling up|vacant posts?|vacancy circular|empanelment|walk[- ]?in|engagement|career|applications invited|invites applications|deputation basis|contract basis|employment notice|employment notification)\b/i;
-  if (stateTerms.test(text) && jobTerms.test(text)) return "state-jobs";
+  const jobTerms = /\b(recruitment|vacanc(?:y|ies)|apprentice|appointment|hiring|apply online|posts?|jobs?|filling up|walk[- ]?in|engagement|career|applications invited|deputation basis|contract basis|employment notice|employment notification)\b/i;
   if (jobTerms.test(text)) return "latest-jobs";
-  return "other";
+  return "latest-jobs";
 }
 
 function isOfficialHost(hostname) {
@@ -151,11 +143,25 @@ function auth(req,env){
     req.headers.get("authorization")==="Bearer "+env.ADMIN_TOKEN;
 }
 
+/* Network resilience: bounded retries with backoff; one failing source never stops other sources. */
+async function fetchWithRetry(url, options={}, attempts=3, timeoutMs=12000) {
+  let last;
+  for (let attempt=1; attempt<=attempts; attempt++) {
+    try {
+      const response = await fetch(url, {...options, signal:AbortSignal.timeout(timeoutMs)});
+      if (response.ok || response.status < 500) return response;
+      last = new Error(`HTTP ${response.status}`);
+    } catch (e) { last=e; }
+    if (attempt < attempts) await new Promise(resolve=>setTimeout(resolve, 350*attempt));
+  }
+  throw last || new Error("Source unavailable after retries");
+}
+
 /* RSS FETCH */
 async function fetchFeed(source,env){
   const feedUrl=await validateFeedUrl(source.feed_url);
 
-  const res=await fetch(feedUrl,{
+  const res=await fetchWithRetry(feedUrl,{
     method:"GET",
     headers:{
       "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
@@ -164,8 +170,7 @@ async function fetchFeed(source,env){
       "Cache-Control":"no-cache"
     },
     redirect:"follow",
-    signal:AbortSignal.timeout(12000)
-  });
+  },2,8000);
 
   const type=res.headers.get("content-type")||"";
   const finalUrl = res.url || feedUrl;
@@ -279,15 +284,14 @@ async function fetchOfficialMonitor(monitor){
 
   for(const pageUrl of monitor.urls){
     try{
-      const response=await fetch(pageUrl,{
+      const response=await fetchWithRetry(pageUrl,{
         method:"GET",
         redirect:"follow",
         headers:{
           "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language":"en-IN,en;q=0.9"
         },
-        signal:AbortSignal.timeout(7000)
-      });
+      },2,6000);
 
       if(!response.ok){
         failures.push(
@@ -349,13 +353,17 @@ async function syncOfficialMonitors(db){
 
     if(result.error){
       errors.push(`${monitor.name}: ${result.error}`);
+      await db.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'error',CURRENT_TIMESTAMP,NULL,?) ON CONFLICT(source_name) DO UPDATE SET status='error',last_checked_at=CURRENT_TIMESTAMP,last_error=excluded.last_error").bind(monitor.name,clean(result.error,500)).run();
       continue;
     }
+    await db.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'ok',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL) ON CONFLICT(source_name) DO UPDATE SET status='ok',last_checked_at=CURRENT_TIMESTAMP,last_success_at=CURRENT_TIMESTAMP,last_error=NULL").bind(monitor.name).run();
 
     for(const item of result.entries){
       const guid=("official-page|"+item.link).slice(0,900);
 
       const fingerprint = guid;
+      const duplicate = await db.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+      if (duplicate) { skipped++; continue; }
       const write=await db.prepare(`
         INSERT OR IGNORE INTO review_items
         (fingerprint,title,summary,category,source_name,source_url,status)
@@ -392,45 +400,29 @@ async function syncAll(env){
   let rssSkipped=0;
   const errors=[];
 
-  // 1. RSS feeds sync
-  for(const source of sources.results||[]){
+  // 1. RSS feeds sync concurrently: a slow publisher does not block other sources.
+  await Promise.all((sources.results||[]).map(async source=>{
     try{
       const entries=await fetchFeed(source,env);
-
       for(const item of entries){
         const guid=(source.feed_url+"|"+item.guid).slice(0,900);
-
-        const duplicate = await env.DB.prepare(
-          "SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1"
-        ).bind(item.title).first();
-        if (duplicate) { rssSkipped++; continue; }
-
+        const duplicate=await env.DB.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+        if(duplicate){rssSkipped++;continue;}
         const result=await env.DB.prepare(`
           INSERT OR IGNORE INTO posts
           (guid,title,summary,category,source_name,source_url,published_at,status)
           VALUES(?,?,?,?,?,?,?,'published')
-        `).bind(
-          guid,
-          item.title,
-          item.summary,
-          detectCategory(item.title,item.summary),
-          source.name,
-          item.link,
-          item.publishedAt
-        ).run();
-
-        if(result.meta?.changes)rssInserted++;
-        else rssSkipped++;
+        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary)==="latest-jobs" && CATEGORY_SET.has(source.category) ? source.category : detectCategory(item.title,item.summary)),source.name,item.link,item.publishedAt).run();
+        if(result.meta?.changes)rssInserted++;else rssSkipped++;
       }
-
-      await env.DB.prepare(
-        "UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?"
-      ).bind(source.id).run();
-
+      await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
+      await env.DB.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'ok',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL) ON CONFLICT(source_name) DO UPDATE SET status='ok',last_checked_at=CURRENT_TIMESTAMP,last_success_at=CURRENT_TIMESTAMP,last_error=NULL").bind(source.name).run();
     }catch(e){
-      errors.push(`${source.name}: ${clean(e.message,180)}`);
+      const message=clean(e.message,180);
+      errors.push(`${source.name}: ${message}`);
+      await env.DB.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'error',CURRENT_TIMESTAMP,NULL,?) ON CONFLICT(source_name) DO UPDATE SET status='error',last_checked_at=CURRENT_TIMESTAMP,last_error=excluded.last_error").bind(source.name,message).run();
     }
-  }
+  }));
 
   // 2. Official website monitoring
   let officialResult={
@@ -580,6 +572,11 @@ export default {
           },401,corsOrigin);
         }
 
+        if(path==="/api/admin/health"&&request.method==="GET"){
+          const runs=await env.DB.prepare("SELECT source_name,status,last_checked_at,last_success_at,last_error FROM source_health ORDER BY last_checked_at DESC LIMIT 40").all();
+          return json({sources:runs.results||[]},200,corsOrigin);
+        }
+
         if(path==="/api/admin/sources"&&request.method==="GET"){
           const rows=await env.DB.prepare(
             "SELECT id,name,feed_url,category,active,last_checked_at FROM sources ORDER BY id DESC"
@@ -611,6 +608,18 @@ export default {
             ok:true,
             message:"Feed source added and enabled for automatic publishing."
           },201,corsOrigin);
+        }
+
+        if(path==="/api/admin/posts"&&request.method==="POST"){
+          const body=await request.json();
+          const title=clean(body.title,220), summary=clean(body.summary,1200), source_name=clean(body.source_name||"GO7 Admin",100);
+          const source_url=String(body.source_url||"").trim(), category=String(body.category||"");
+          if(!title || !CATEGORY_SET.has(category) || !safeHttpUrl(source_url)) return json({error:"Valid title, category and official HTTP(S) source URL are required."},400,corsOrigin);
+          const host=new URL(source_url).hostname;
+          if(!isOfficialHost(host)) return json({error:"Manual posts must link to an official .gov.in, .nic.in, .ac.in or .edu.in source."},400,corsOrigin);
+          const guid="manual|"+crypto.randomUUID();
+          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published')").bind(guid,title,summary,category,source_name,source_url).run();
+          return json({ok:true,id:result.meta?.last_row_id,message:"Post published."},201,corsOrigin);
         }
 
         if(path==="/api/admin/review"&&request.method==="GET"){
@@ -657,14 +666,7 @@ export default {
 
           for(const post of rows.results||[]){
             const category=detectCategory(post.title,post.summary);
-            let officialLink=false;
-            try{officialLink=isOfficialHost(new URL(post.source_url).hostname);}catch{}
-            if(!isUsefulNoticeTitle(post.title)||!officialLink){
-              await env.DB.prepare("UPDATE posts SET status='hidden' WHERE id=?").bind(post.id).run();
-              changed++;
-              continue;
-            }
-
+            // Reclassification must never hide or delete an already published post.
             if(category!==post.category){
               await env.DB.prepare(
                 "UPDATE posts SET category=? WHERE id=?"
