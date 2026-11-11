@@ -369,3 +369,30 @@ footer{width:min(calc(100% - 28px),1070px)}
 .footer-links{margin-left:auto;justify-content:flex-end;gap:14px!important}
 .footer-links a{color:#f5eeee!important;font-size:14px!important;font-weight:500!important}
 @media(max-width:760px){.footer-inner{padding:14px 10px!important;align-items:flex-start!important}.footer-copy{white-space:normal}.footer-links{width:100%;margin-left:0;justify-content:flex-start;gap:10px 14px!important}.footer-links a{font-size:14px!important}}
+
+
+/* GO7 final alignment: split logo, consistent footer frame, clickable post titles */
+.brand{display:flex;flex:1;min-width:0;width:100%;}
+.brand-name{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%;min-width:0;font-size:inherit;line-height:normal;letter-spacing:normal;font-weight:400;}
+.brand-left{display:flex;flex-direction:column;align-items:flex-start;flex:0 0 auto;}
+.brand-name strong{display:block;font-size:38px;line-height:1;font-weight:800;letter-spacing:-1.2px;color:var(--navy);}
+.brand-name small{display:block;margin-top:3px;font-size:15px;line-height:1.2;font-weight:600;letter-spacing:.2px;color:var(--navy);}
+.brand-name em{display:block;margin-left:auto;text-align:right;font-style:normal;font-size:10px;line-height:1.4;font-weight:700;letter-spacing:2px;color:#66758a;}
+.post-title-link{color:var(--navy);text-decoration:none;}
+.post-title-link:hover{color:var(--red);text-decoration:underline;}
+.post h3 .post-title-link{display:inline;}
+footer{width:min(calc(100% - 32px),var(--width));margin:0 auto 16px;}
+.footer-inner{width:100%;max-width:none;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:24px;}
+.footer-copy{min-width:0;}
+.footer-links{min-width:0;justify-content:flex-end;flex-wrap:wrap;}
+@media(max-width:760px){
+ .brand-row{min-height:76px;}
+ .brand-name{gap:10px;}
+ .brand-name strong{font-size:31px;}
+ .brand-name small{font-size:13px;}
+ .brand-name em{font-size:8px;letter-spacing:1.1px;max-width:52%;}
+ .footer-inner{display:flex;align-items:flex-start;gap:10px;width:100%;}
+ .footer-copy{white-space:normal;}
+ .footer-links{width:100%;margin-left:0;justify-content:flex-start;gap:10px 14px;}
+}
+@media(max-width:380px){.brand-name em{font-size:7px;letter-spacing:.7px;}}

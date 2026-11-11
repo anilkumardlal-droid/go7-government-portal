@@ -62,7 +62,7 @@ function renderPosts(posts, append = false) {
         </span>
       </div>
 
-      <h3>${esc(post.title || "Government Update")}</h3>
+      <h3><a class="post-title-link" href="/detail.html?id=${encodeURIComponent(post.id)}">${esc(post.title || "Government Update")}</a></h3>
 
       <p>
         ${esc(
@@ -220,7 +220,7 @@ async function refreshLatestLive() {
     const html = fresh.map((post) => `
       <article class="post live-new" data-post-id="${esc(post.id)}">
         <div class="post-meta"><span class="pill">${esc(post.category_label || post.category || "Update")}</span><span>${esc(dateLabel(post.published_at || post.created_at))}</span></div>
-        <h3>${esc(post.title || "Government Update")}</h3>
+        <h3><a class="post-title-link" href="/detail.html?id=${encodeURIComponent(post.id)}">${esc(post.title || "Government Update")}</a></h3>
         <p>${esc(post.summary || "Open the original publisher's notice for complete details.")}</p>
         <a href="/detail.html?id=${encodeURIComponent(post.id)}">View full details →</a>
       </article>`).join("");

@@ -49,7 +49,7 @@ async function loadRelatedPosts(category, currentId) {
     target.innerHTML = related.map(post => `
       <article class="post related-post">
         <div class="post-meta"><span class="pill">${esc(post.category_label || post.category || "Update")}</span><span>${esc(post.published_at || post.created_at ? new Date(post.published_at || post.created_at).toLocaleDateString("en-IN") : "Recently added")}</span></div>
-        <h3>${esc(post.title || "Government Update")}</h3>
+        <h3><a class="post-title-link" href="/detail.html?id=${encodeURIComponent(post.id)}">${esc(post.title || "Government Update")}</a></h3>
         <p>${esc(post.summary || "Open the original publisher's notice for complete details.")}</p>
         <a href="/detail.html?id=${encodeURIComponent(post.id)}">View details →</a>
       </article>`).join("");
@@ -66,15 +66,35 @@ if (!id || !/^\d+$/.test(id)) {
   status.textContent =
     "Update not found. Return to the homepage and choose a listing.";
 } else {
-  fetch(`${API}/api/posts/${id}`)
-    .then((r) => {
-      if (!r.ok) {
-        throw new Error("Update is not available yet.");
+  async function fetchPostById(postId) {
+    // Prefer the dedicated detail endpoint.
+    try {
+      const response = await fetch(`${API}/api/posts/${encodeURIComponent(postId)}`, { cache: "no-store" });
+      if (response.ok) {
+        const payload = await response.json();
+        const directPost = payload.post || payload.data?.post || payload.data || payload;
+        if (directPost && String(directPost.id) === String(postId)) return directPost;
       }
+    } catch (error) {
+      console.warn("Dedicated post endpoint unavailable; trying feed lookup.", error);
+    }
 
-      return r.json();
-    })
-    .then(({ post: p }) => {
+    // Compatibility fallback: find the same post through the public paginated feed.
+    for (let offset = 0; offset < 500; offset += 25) {
+      const query = new URLSearchParams({ limit: "25", offset: String(offset) });
+      const response = await fetch(`${API}/api/posts?${query}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Updates service returned ${response.status}.`);
+      const payload = await response.json();
+      const posts = payload.posts || [];
+      const found = posts.find(item => String(item.id) === String(postId));
+      if (found) return found;
+      if (!payload.has_more || posts.length === 0) break;
+    }
+    throw new Error("Update not found. It may have been removed or is not published.");
+  }
+
+  fetchPostById(id)
+    .then((p) => {
       if (!p) {
         throw new Error("Update not found.");
       }
