@@ -32,8 +32,8 @@ function dateTimeLabel(value) {
   );
 }
 
-document.getElementById("year").textContent =
-  new Date().getFullYear();
+const yearElement = document.getElementById("year");
+if (yearElement) yearElement.textContent = new Date().getFullYear();
 
 async function loadRelatedPosts(category, currentId) {
   const section = document.getElementById("relatedSection");
@@ -61,6 +61,10 @@ const id = new URLSearchParams(location.search).get("id");
 
 const box = document.getElementById("detailContent");
 const status = document.getElementById("detailStatus");
+
+if (!box || !status) {
+  console.error("GO7 detail page is missing #detailContent or #detailStatus.");
+}
 
 if (!id || !/^\d+$/.test(id)) {
   status.textContent =
