@@ -138,6 +138,7 @@ async function loadPosts(append = false) {
   }
 
   state.loading = true;
+  $("refreshBtn")?.classList.add("is-refreshing");
 
   if ($("status")) {
     $("status").textContent = append ? "Loading more updates…" : "Loading updates…";
@@ -172,7 +173,7 @@ async function loadPosts(append = false) {
 
     renderPosts(posts, append);
 
-    state.hasMore = Boolean(data.has_more);
+    state.hasMore = posts.length > 0 && Boolean(data.has_more);
 
     if ($("loadMore")) {
       $("loadMore").hidden = !state.hasMore;
@@ -196,6 +197,7 @@ async function loadPosts(append = false) {
     }
   } finally {
     state.loading = false;
+    $("refreshBtn")?.classList.remove("is-refreshing");
     if ($("loadMore")) {
       $("loadMore").disabled = false;
       $("loadMore").textContent = "Load More";
