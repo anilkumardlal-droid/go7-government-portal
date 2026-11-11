@@ -35,6 +35,28 @@ function dateTimeLabel(value) {
 document.getElementById("year").textContent =
   new Date().getFullYear();
 
+async function loadRelatedPosts(category, currentId) {
+  const section = document.getElementById("relatedSection");
+  const target = document.getElementById("relatedPosts");
+  if (!section || !target || !category) return;
+  try {
+    const q = new URLSearchParams({ category, limit: "6", offset: "0" });
+    const r = await fetch(`${API}/api/posts?${q}`, { cache: "no-store" });
+    if (!r.ok) return;
+    const data = await r.json();
+    const related = (data.posts || []).filter(post => String(post.id) !== String(currentId)).slice(0, 5);
+    if (!related.length) return;
+    target.innerHTML = related.map(post => `
+      <article class="post related-post">
+        <div class="post-meta"><span class="pill">${esc(post.category_label || post.category || "Update")}</span><span>${esc(post.published_at || post.created_at ? new Date(post.published_at || post.created_at).toLocaleDateString("en-IN") : "Recently added")}</span></div>
+        <h3>${esc(post.title || "Government Update")}</h3>
+        <p>${esc(post.summary || "Open the original publisher's notice for complete details.")}</p>
+        <a href="/detail.html?id=${encodeURIComponent(post.id)}">View details →</a>
+      </article>`).join("");
+    section.hidden = false;
+  } catch (error) { console.warn("Related posts unavailable:", error); }
+}
+
 const id = new URLSearchParams(location.search).get("id");
 
 const box = document.getElementById("detailContent");
@@ -148,6 +170,7 @@ if (!id || !/^\d+$/.test(id)) {
           </div>
         </div>
       `;
+      loadRelatedPosts(p.category, p.id);
     })
     .catch((e) => {
       status.textContent =
@@ -155,12 +178,3 @@ if (!id || !/^\d+$/.test(id)) {
     });
 }
 
-const toggle = document.getElementById("menuToggle");
-const nav = document.getElementById("mainNav");
-
-toggle?.addEventListener("click", () => {
-  const open = nav.classList.toggle("open");
-
-  toggle.setAttribute("aria-expanded", String(open));
-  toggle.textContent = open ? "✕ Close" : "☰ Menu";
-});

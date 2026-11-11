@@ -1,9 +1,10 @@
 
 const API = (window.GO7_CONFIG?.API_BASE || "").replace(/\/$/, "");
 
+const initialQuery = new URLSearchParams(window.location.search).get("q") || "";
 const state = {
   category: "",
-  search: "",
+  search: initialQuery,
   offset: 0,
   limit: 10,
   hasMore: false,
@@ -93,7 +94,7 @@ async function fetchCategory(category) {
   try {
     const query = new URLSearchParams({
       category,
-      limit: "20",
+      limit: "21",
       offset: "0"
     });
 
@@ -105,7 +106,10 @@ async function fetchCategory(category) {
 
     const data = await response.json();
 
-    panel.innerHTML = (data.posts || []).map((post) => `
+    const panelPosts = data.posts || [];
+    const viewMore = panel.closest(".info-panel")?.querySelector(".view-all");
+    if (viewMore) viewMore.hidden = !(panelPosts.length > 20 || data.has_more);
+    panel.innerHTML = panelPosts.slice(0, 20).map((post) => `
       <a class="feed-link"
          href="/detail.html?id=${encodeURIComponent(post.id)}">
         ${esc(post.title)}
@@ -273,29 +277,12 @@ if ($("loadMore")) {
 
 // View More links intentionally navigate to dedicated category pages.
 
-// Mobile navigation
-const menuToggle = $("menuToggle");
-const mainNav = $("mainNav");
-
-if (menuToggle && mainNav) {
-  menuToggle.addEventListener("click", () => {
-    const isOpen = mainNav.classList.toggle("open");
-
-    menuToggle.setAttribute("aria-expanded", String(isOpen));
-    menuToggle.textContent = isOpen ? "✕ Close" : "☰ Menu";
-  });
-
-  mainNav.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", () => {
-      mainNav.classList.remove("open");
-      menuToggle.setAttribute("aria-expanded", "false");
-      menuToggle.textContent = "☰ Menu";
-    });
-  });
-}
 
 // Initial loading
 if (API) {
+  if (state.search && $("feedTitle")) {
+    $("feedTitle").textContent = `Search: ${state.search}`;
+  }
   loadPosts();
 
   document.querySelectorAll(".info-panel").forEach((panel) => {
