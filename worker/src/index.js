@@ -92,6 +92,13 @@ export default {
     try{
       if(path==="/api/health")return json({ok:true,service:"GO7 Government API"},200,corsOrigin);
       if(path==="/api/categories")return json({categories:CATEGORIES.map(([id,label])=>({id,label}))},200,corsOrigin);
+      const detailMatch=path.match(/^\/api\/posts\/(\d+)$/);
+      if(detailMatch&&request.method==="GET"){
+        const post=await env.DB.prepare("SELECT id,title,summary,category,source_name,source_url,published_at,created_at FROM posts WHERE id=? AND status='published'").bind(Number(detailMatch[1])).first();
+        if(!post)return json({error:"Post not found"},404,corsOrigin);
+        const labelMap=Object.fromEntries(CATEGORIES);
+        return json({post:{...post,category_label:labelMap[post.category]||post.category}},200,corsOrigin);
+      }
       if(path==="/api/posts"&&request.method==="GET"){
         const limit=Math.max(1,Math.min(50,Number(url.searchParams.get("limit"))||20));
         const offset=Math.max(0,Number(url.searchParams.get("offset"))||0);

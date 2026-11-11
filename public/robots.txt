@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://jobs.go7.in/sitemap.xml

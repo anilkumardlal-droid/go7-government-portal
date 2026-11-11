@@ -3,54 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="GO7 Government Updates — jobs, results, admit cards, answer keys and official education notices.">
-  <meta name="theme-color" content="#10233f">
+  <meta name="description" content="GO7 Government Updates — jobs, results, admit cards, answer keys and education notices from original sources.">
+  <meta name="theme-color" content="#b5121b">
   <title>GO7 Government Updates | Jobs, Results & Admit Cards</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/config.js"></script>
 </head>
 <body>
-<header class="topbar">
-  <a class="brand" href="/"><span class="brand-mark">G7</span><span>GO7 <small>GOVERNMENT UPDATES</small></span></a>
-  <nav><a href="#latest">Latest Updates</a><a href="#categories">Categories</a><a href="/about.html">About</a></nav>
+<header class="site-header"><div class="container">
+  <div class="brand-row">
+    <a class="brand" href="/" aria-label="GO7 Government Updates home"><span class="brand-mark">GO7</span><span class="brand-name">GO7 <small>GOVERNMENT UPDATES</small></span></a>
+    <div class="header-note">Independent information portal • India</div>
+  </div>
+  <div class="nav-wrap"><button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="mainNav" aria-label="Open menu">☰ Menu</button><nav class="main-nav" id="mainNav" aria-label="Main navigation">
+    <a href="#latest-jobs">Latest Jobs</a><a href="#results">Results</a><a href="#admit-cards">Admit Cards</a><a href="#answer-keys">Answer Keys</a><a href="#admissions">Admissions</a><a href="/about.html">About</a>
+  </nav></div>
+  <div class="ticker"><div class="container" style="display:flex;align-items:center;gap:10px"><strong>GO7 UPDATE</strong><span>Find job notifications, exam results, admit cards and education updates. Always verify details on the official website.</span></div></div></div>
 </header>
-<main>
-  <section class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">INDIA • GOVERNMENT & EDUCATION UPDATES</p>
-      <h1>Find your next <em>opportunity.</em></h1>
-      <p class="hero-sub">A clear, searchable directory of job notifications, exam results, admit cards and education updates — with links to original sources.</p>
-      <form id="searchForm" class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="Search jobs, exams, departments..." aria-label="Search updates"><button>Search</button></form>
-      <div class="hero-note">Always verify dates and eligibility in the official notification.</div>
-    </div>
-    <div class="hero-art" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="paper"><div class="paper-top"></div><div class="paper-line"></div><div class="paper-line short"></div><div class="paper-stamp">GO7</div><div class="paper-line"></div><div class="paper-line mid"></div></div><div class="spark">✦</div></div>
+<main class="page-wrap container">
+  <section class="intro-strip">
+    <div><p class="eyebrow">WELCOME TO GO7</p><h1>Government Jobs & Exam Updates</h1><p>Search the latest notifications and go directly to the original official source.</p></div>
+    <form id="searchForm" class="search"><input id="searchInput" type="search" placeholder="Search by post, department, exam…" aria-label="Search updates"><button>Search</button></form>
   </section>
-
-  <section id="categories" class="section">
-    <div class="section-heading"><div><p class="eyebrow">EXPLORE</p><h2>Browse categories</h2></div><p>Find updates by type</p></div>
-    <div id="categoryGrid" class="category-grid">
-      <button class="category-card" data-category="latest-jobs"><b>↗</b><span>Latest Jobs</span></button>
-      <button class="category-card" data-category="results"><b>✓</b><span>Results</span></button>
-      <button class="category-card" data-category="admit-cards"><b>▣</b><span>Admit Cards</span></button>
-      <button class="category-card" data-category="answer-keys"><b>≡</b><span>Answer Keys</span></button>
-      <button class="category-card" data-category="admissions"><b>⌂</b><span>Admissions</span></button>
-      <button class="category-card" data-category="syllabus"><b>▤</b><span>Syllabus</span></button>
-      <button class="category-card" data-category="exam-calendar"><b>◷</b><span>Exam Calendar</span></button>
-      <button class="category-card" data-category="scholarships"><b>☆</b><span>Scholarships</span></button>
-      <button class="category-card" data-category="state-jobs"><b>⌖</b><span>State Jobs</span></button>
-      <button class="category-card" data-category="other"><b>＋</b><span>Other Updates</span></button>
-    </div>
+  <section class="quick-links" aria-label="Quick categories">
+    <a href="#latest-jobs">Latest Jobs</a><a href="#results">Results</a><a href="#admit-cards">Admit Cards</a><a href="#answer-keys">Answer Keys</a><a href="#admissions">Admissions</a><a href="#syllabus">Syllabus</a><a href="#exam-calendar">Exam Calendar</a><a href="#scholarships">Scholarships</a><a href="#state-jobs">State Jobs</a>
   </section>
-
-  <section id="latest" class="section latest-section">
-    <div class="section-heading"><div><p class="eyebrow">FRESH FROM SOURCES</p><h2 id="feedTitle">Latest updates</h2></div><button id="refreshBtn" class="text-button">Refresh ↻</button></div>
-    <div id="status" class="status">Connecting to GO7 updates…</div>
-    <div id="postList" class="post-list"></div>
-    <button id="loadMore" class="load-more" hidden>Load more</button>
+  <div class="content-grid" id="categorySections">
+    <section class="info-panel" id="latest-jobs" data-category="latest-jobs"><h2>Latest Jobs</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Latest Jobs →</a></section>
+    <section class="info-panel" id="results" data-category="results"><h2>Results</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Results →</a></section>
+    <section class="info-panel" id="admit-cards" data-category="admit-cards"><h2>Admit Cards</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Admit Cards →</a></section>
+    <section class="info-panel" id="answer-keys" data-category="answer-keys"><h2>Answer Keys</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Answer Keys →</a></section>
+    <section class="info-panel" id="admissions" data-category="admissions"><h2>Admissions</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Admissions →</a></section>
+    <section class="info-panel" id="syllabus" data-category="syllabus"><h2>Syllabus</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Syllabus →</a></section>
+    <section class="info-panel" id="exam-calendar" data-category="exam-calendar"><h2>Exam Calendar</h2><div class="panel-body"></div><a class="view-all" href="#latest">View Exam Calendar →</a></section>
+    <section class="info-panel" id="scholarships" data-category="scholarships"><h2>Scholarships</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Scholarships →</a></section>
+    <section class="info-panel" id="state-jobs" data-category="state-jobs"><h2>State Jobs</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all State Jobs →</a></section>
+    <section class="info-panel" id="other" data-category="other"><h2>Other Updates</h2><div class="panel-body"></div><a class="view-all" href="#latest">View all Updates →</a></section>
+  </div>
+  <section class="latest-all" id="latest">
+    <div class="section-title"><div><p class="eyebrow">ALL CATEGORIES</p><h2 id="feedTitle">Latest Updates</h2></div><button id="refreshBtn" class="refresh">Refresh ↻</button></div>
+    <div id="status" class="status">Connecting to GO7 updates…</div><div id="postList" class="all-posts"></div><button id="loadMore" class="load-more" hidden>Load more</button>
   </section>
-  <section class="notice"><b>Important:</b> GO7 is an independent information portal, not a government website. We link to original publishers. Always confirm eligibility, deadlines, fees and instructions from the official notification before applying.</section>
+  <section class="disclaimer"><strong>Important:</strong> GO7 is an independent information portal and is not a government website. We link to original publishers. Always verify eligibility, dates, fees and instructions in the official notification.</section>
 </main>
-<footer><div class="footer-brand">GO7 <span>GOVERNMENT UPDATES</span></div><div><a href="/about.html">About</a><a href="/privacy.html">Privacy</a><a href="/disclaimer.html">Disclaimer</a><a href="/admin.html">Admin</a></div><small>© <span id="year"></span> GO7. Independent information service.</small></footer>
+<footer><div class="footer-inner container"><div class="footer-brand"><strong>GO7</strong><small>GOVERNMENT UPDATES</small></div><div class="footer-links"><a href="/about.html">About</a><a href="/privacy.html">Privacy</a><a href="/disclaimer.html">Disclaimer</a><a href="/admin.html">Admin</a></div><small>© <span id="year"></span> GO7. Independent information service.</small></div></footer>
 <script src="/app.js"></script>
 </body>
 </html>
