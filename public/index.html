@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="GO7 Government Updates — jobs, results, admit cards, answer keys and official education notices.">
+  <meta name="theme-color" content="#10233f">
+  <title>GO7 Government Updates | Jobs, Results & Admit Cards</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/config.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/"><span class="brand-mark">G7</span><span>GO7 <small>GOVERNMENT UPDATES</small></span></a>
+  <nav><a href="#latest">Latest Updates</a><a href="#categories">Categories</a><a href="/about.html">About</a></nav>
+</header>
+<main>
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">INDIA • GOVERNMENT & EDUCATION UPDATES</p>
+      <h1>Find your next <em>opportunity.</em></h1>
+      <p class="hero-sub">A clear, searchable directory of job notifications, exam results, admit cards and education updates — with links to original sources.</p>
+      <form id="searchForm" class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="Search jobs, exams, departments..." aria-label="Search updates"><button>Search</button></form>
+      <div class="hero-note">Always verify dates and eligibility in the official notification.</div>
+    </div>
+    <div class="hero-art" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="paper"><div class="paper-top"></div><div class="paper-line"></div><div class="paper-line short"></div><div class="paper-stamp">GO7</div><div class="paper-line"></div><div class="paper-line mid"></div></div><div class="spark">✦</div></div>
+  </section>
+
+  <section id="categories" class="section">
+    <div class="section-heading"><div><p class="eyebrow">EXPLORE</p><h2>Browse categories</h2></div><p>Find updates by type</p></div>
+    <div id="categoryGrid" class="category-grid">
+      <button class="category-card" data-category="latest-jobs"><b>↗</b><span>Latest Jobs</span></button>
+      <button class="category-card" data-category="results"><b>✓</b><span>Results</span></button>
+      <button class="category-card" data-category="admit-cards"><b>▣</b><span>Admit Cards</span></button>
+      <button class="category-card" data-category="answer-keys"><b>≡</b><span>Answer Keys</span></button>
+      <button class="category-card" data-category="admissions"><b>⌂</b><span>Admissions</span></button>
+      <button class="category-card" data-category="syllabus"><b>▤</b><span>Syllabus</span></button>
+      <button class="category-card" data-category="exam-calendar"><b>◷</b><span>Exam Calendar</span></button>
+      <button class="category-card" data-category="scholarships"><b>☆</b><span>Scholarships</span></button>
+      <button class="category-card" data-category="state-jobs"><b>⌖</b><span>State Jobs</span></button>
+      <button class="category-card" data-category="other"><b>＋</b><span>Other Updates</span></button>
+    </div>
+  </section>
+
+  <section id="latest" class="section latest-section">
+    <div class="section-heading"><div><p class="eyebrow">FRESH FROM SOURCES</p><h2 id="feedTitle">Latest updates</h2></div><button id="refreshBtn" class="text-button">Refresh ↻</button></div>
+    <div id="status" class="status">Connecting to GO7 updates…</div>
+    <div id="postList" class="post-list"></div>
+    <button id="loadMore" class="load-more" hidden>Load more</button>
+  </section>
+  <section class="notice"><b>Important:</b> GO7 is an independent information portal, not a government website. We link to original publishers. Always confirm eligibility, deadlines, fees and instructions from the official notification before applying.</section>
+</main>
+<footer><div class="footer-brand">GO7 <span>GOVERNMENT UPDATES</span></div><div><a href="/about.html">About</a><a href="/privacy.html">Privacy</a><a href="/disclaimer.html">Disclaimer</a><a href="/admin.html">Admin</a></div><small>© <span id="year"></span> GO7. Independent information service.</small></footer>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GO7 Admin</title><link rel="stylesheet" href="/styles.css"><script src="/config.js"></script></head>
+<body><header class="topbar"><a class="brand" href="/"><span class="brand-mark">G7</span><span>GO7 <small>ADMIN CONSOLE</small></span></a><nav><a href="/">Public site</a></nav></header>
+<main class="admin-wrap">
+  <section class="panel"><p class="eyebrow">PRIVATE ADMINISTRATION</p><h1>GO7 Feed Manager</h1><p class="message">Only add RSS/Atom sources that permit automated retrieval and reuse of short feed metadata. The public site links to the original notice.</p>
+    <div class="field"><label for="token">Admin token</label><input id="token" type="password" autocomplete="current-password" placeholder="Enter Worker ADMIN_TOKEN"></div>
+    <div class="admin-actions"><button id="loadSources" class="secondary">Load sources</button><button id="sync" class="primary">Sync now</button></div>
+    <p id="msg" class="message" role="status"></p>
+  </section>
+  <section class="panel"><h2>Add an authorized feed</h2>
+    <div class="field"><label for="name">Source name</label><input id="name" placeholder="Example: Official recruitment board"></div>
+    <div class="field"><label for="category">Default category</label><select id="category"><option value="latest-jobs">Latest Jobs</option><option value="results">Results</option><option value="admit-cards">Admit Cards</option><option value="answer-keys">Answer Keys</option><option value="admissions">Admissions</option><option value="syllabus">Syllabus</option><option value="exam-calendar">Exam Calendar</option><option value="scholarships">Scholarships</option><option value="state-jobs">State Jobs</option><option value="other">Other</option></select></div>
+    <div class="field"><label for="feed">RSS / Atom feed URL</label><input id="feed" type="url" placeholder="https://publisher.gov.in/feed.xml"></div>
+    <button id="add" class="primary">Add source</button>
+  </section>
+  <section class="panel"><h2>Configured sources</h2><div id="sources" class="message">Not loaded.</div></section>
+</main><script src="/admin.js"></script></body></html>
