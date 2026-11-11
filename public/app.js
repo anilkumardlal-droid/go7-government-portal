@@ -94,7 +94,7 @@ async function fetchCategory(category) {
   try {
     const query = new URLSearchParams({
       category,
-      limit: "21",
+      limit: "11",
       offset: "0"
     });
 
@@ -108,8 +108,8 @@ async function fetchCategory(category) {
 
     const panelPosts = data.posts || [];
     const viewMore = panel.closest(".info-panel")?.querySelector(".view-all");
-    if (viewMore) viewMore.hidden = !(panelPosts.length > 20 || data.has_more);
-    panel.innerHTML = panelPosts.slice(0, 20).map((post) => `
+    if (viewMore) viewMore.hidden = !(panelPosts.length > 10 || data.has_more);
+    panel.innerHTML = panelPosts.slice(0, 10).map((post) => `
       <a class="feed-link"
          href="/detail.html?id=${encodeURIComponent(post.id)}">
         ${esc(post.title)}
@@ -207,6 +207,7 @@ async function loadPosts(append = false) {
 // posts that the visitor may already have loaded with the Load More button.
 async function refreshLatestLive() {
   if (!API || state.loading) return;
+  document.querySelectorAll(".info-panel[data-category]").forEach((panel) => fetchCategory(panel.dataset.category));
   try {
     const response = await fetch(`${API}/api/posts?limit=10&offset=0`, { cache: "no-store" });
     if (!response.ok) return;
