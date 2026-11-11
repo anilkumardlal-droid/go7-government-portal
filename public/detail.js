@@ -91,6 +91,15 @@ if (!id || !/^\d+$/.test(id)) {
           </p>
         </div>
 
+        ${p.category === "results" ? `
+        <div class="detail-section result-detail-section">
+          <h2>Result Details</h2>
+          <p><strong>Result / Exam:</strong> ${esc(p.title)}</p>
+          <p><strong>Result source:</strong> ${esc(p.source_name || "Original publisher")}</p>
+          <p><strong>Published on:</strong> ${esc(publishedDate)}</p>
+          <p>For scorecard, roll-number search, cut-off, merit list, qualifying status and any correction notice, open the original result notice below. Only information supplied by the publisher is shown here.</p>
+        </div>` : ""}
+
         <div class="detail-section">
           <h2>Important Information</h2>
 

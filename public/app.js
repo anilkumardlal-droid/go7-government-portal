@@ -5,7 +5,7 @@ const state = {
   category: "",
   search: "",
   offset: 0,
-  limit: 30,
+  limit: 10,
   hasMore: false,
   loading: false
 };
@@ -51,7 +51,7 @@ function showEmpty(message) {
 
 function renderPosts(posts, append = false) {
   const html = posts.map((post) => `
-    <article class="post">
+    <article class="post" data-post-id="${esc(post.id)}">
       <div class="post-meta">
         <span class="pill">
           ${esc(post.category_label || post.category || "Update")}
@@ -93,11 +93,11 @@ async function fetchCategory(category) {
   try {
     const query = new URLSearchParams({
       category,
-      limit: "4",
+      limit: "20",
       offset: "0"
     });
 
-    const response = await fetch(`${API}/api/posts?${query}`);
+    const response = await fetch(`${API}/api/posts?${query}`, { cache: "no-store" });
 
     if (!response.ok) {
       throw new Error(`API returned ${response.status}`);
@@ -136,7 +136,11 @@ async function loadPosts(append = false) {
   state.loading = true;
 
   if ($("status")) {
-    $("status").textContent = "Loading updates…";
+    $("status").textContent = append ? "Loading more updates…" : "Loading updates…";
+  }
+  if (append && $("loadMore")) {
+    $("loadMore").disabled = true;
+    $("loadMore").textContent = "Loading…";
   }
 
   const query = new URLSearchParams({
@@ -153,7 +157,7 @@ async function loadPosts(append = false) {
   }
 
   try {
-    const response = await fetch(`${API}/api/posts?${query}`);
+    const response = await fetch(`${API}/api/posts?${query}`, { cache: "no-store" });
 
     if (!response.ok) {
       throw new Error(`API returned ${response.status}`);
@@ -188,6 +192,35 @@ async function loadPosts(append = false) {
     }
   } finally {
     state.loading = false;
+    if ($("loadMore")) {
+      $("loadMore").disabled = false;
+      $("loadMore").textContent = "Load More";
+    }
+  }
+}
+
+// Live refresh every 60 seconds. New posts are inserted without replacing older
+// posts that the visitor may already have loaded with the Load More button.
+async function refreshLatestLive() {
+  if (!API || state.loading) return;
+  try {
+    const response = await fetch(`${API}/api/posts?limit=10&offset=0`, { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const existing = new Set(Array.from(document.querySelectorAll("#postList [data-post-id]")).map((node) => String(node.dataset.postId)));
+    const fresh = (data.posts || []).filter((post) => !existing.has(String(post.id)));
+    if (!fresh.length) return;
+    const html = fresh.map((post) => `
+      <article class="post live-new" data-post-id="${esc(post.id)}">
+        <div class="post-meta"><span class="pill">${esc(post.category_label || post.category || "Update")}</span><span>${esc(dateLabel(post.published_at || post.created_at))}</span></div>
+        <h3>${esc(post.title || "Government Update")}</h3>
+        <p>${esc(post.summary || "Open the original publisher's notice for complete details.")}</p>
+        <a href="/detail.html?id=${encodeURIComponent(post.id)}">View full details →</a>
+      </article>`).join("");
+    $("postList")?.insertAdjacentHTML("afterbegin", html);
+    if ($("status")) $("status").textContent = `${data.total ?? data.posts.length} published updates · New updates just arrived`;
+  } catch (error) {
+    console.warn("Live refresh skipped:", error);
   }
 }
 
@@ -270,6 +303,7 @@ if (API) {
       fetchCategory(panel.dataset.category);
     }
   });
+  window.setInterval(refreshLatestLive, 60000);
 } else {
   showEmpty("API configuration is missing.");
   if ($("status")) {
