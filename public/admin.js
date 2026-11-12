@@ -72,3 +72,50 @@ $("review").addEventListener("click",async event=>{
 $("publishPost").onclick=async()=>{try{say("Publishing verified update…");const d=await call("/api/admin/posts","POST",{title:$("postTitle").value.trim(),summary:$("postSummary").value.trim(),category:$("postCategory").value,source_name:$("postSource").value.trim(),source_url:$("postUrl").value.trim()});say(d.message||"Published.");$("postTitle").value="";$("postSummary").value="";$("postUrl").value="";}catch(e){say(e.message);}};
 
 $("loadHealth").onclick=async()=>{try{const d=await call("/api/admin/health");const rows=d.sources||[];$("health").innerHTML=rows.map(x=>`<div class="source-row"><b>${escapeHtml(x.source_name)}</b> · <strong>${escapeHtml(x.status)}</strong><br><small>Checked: ${escapeHtml(x.last_checked_at||"-")} · Last success: ${escapeHtml(x.last_success_at||"-")}</small>${x.last_error?`<br><span style="color:#b5121b">${escapeHtml(x.last_error)}</span>`:""}</div>`).join("")||"No source checks recorded yet. Run Sync RSS feeds first.";}catch(e){say(e.message);}};
+
+
+// Browser-side PDF parsing keeps large PDF processing out of the Worker CPU budget.
+const aiLoadButton = $("loadAiPosts");
+if (aiLoadButton) {
+  if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  aiLoadButton.onclick = async () => {
+    try {
+      const d = await call("/api/admin/ai/pending");
+      const items = d.items || [];
+      $("aiPosts").innerHTML = items.map(item => `<div class="source-row"><b>#${item.id} · ${escapeHtml(item.title)}</b><br><small>${escapeHtml(item.source_name || "")} · ${escapeHtml(item.ai_extraction_status || "pending")}</small><br><button type="button" class="secondary" data-ai-select="${item.id}">Select this post</button></div>`).join("") || "No published Latest Jobs posts found.";
+      say(`Loaded ${items.length} Latest Jobs posts.`);
+    } catch (e) { say("Could not load AI posts: " + e.message); }
+  };
+  $("aiPosts").addEventListener("click", event => {
+    const button = event.target.closest("[data-ai-select]");
+    if (!button) return;
+    $("aiPostId").value = button.getAttribute("data-ai-select");
+    $("aiStatus").textContent = `Post #${$("aiPostId").value} selected. Choose its official PDF.`;
+  });
+  $("runAiExtract").onclick = async () => {
+    const postId = $("aiPostId").value.trim();
+    const file = $("aiPdf").files?.[0];
+    const status = $("aiStatus");
+    if (!/^\d+$/.test(postId)) { status.textContent = "पहले सूची से एक पोस्ट चुनें।"; return; }
+    if (!file || (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf"))) { status.textContent = "कृपया official PDF file चुनें।"; return; }
+    if (file.size > 12 * 1024 * 1024) { status.textContent = "PDF अधिकतम 12 MB की होनी चाहिए।"; return; }
+    if (!window.pdfjsLib) { status.textContent = "PDF reader load नहीं हुआ। Internet connection जाँचें और page reload करें।"; return; }
+    try {
+      status.textContent = "PDF browser में पढ़ी जा रही है…";
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
+      if (pdf.numPages > 150) throw new Error("PDF में 150 से अधिक pages हैं। कृपया छोटी official notification PDF चुनें।");
+      let extracted = "";
+      for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+        const page = await pdf.getPage(pageNo);
+        const content = await page.getTextContent();
+        extracted += content.items.map(item => item.str || "").join(" ") + "\n";
+        if (extracted.length > 50000) { extracted = extracted.slice(0, 50000); break; }
+      }
+      if (extracted.trim().length < 300) throw new Error("PDF में selectable text नहीं मिला। यह scanned PDF हो सकती है; OCR की जरूरत होगी।");
+      status.textContent = "PDF पढ़ ली गई। Cloudflare AI से जानकारी निकाली जा रही है…";
+      const result = await call(`/api/admin/posts/${postId}/extract-text`, "POST", { text: extracted, source_url: "" });
+      status.textContent = result.message || "AI extraction completed.";
+    } catch (e) { status.textContent = "Extraction failed: " + e.message; }
+  };
+}
