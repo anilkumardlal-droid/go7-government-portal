@@ -1,39 +1,39 @@
-# GO7 Government Updates Portal
+# Jobs GO7 Government Portal
 
-A responsive, original GO7 government-jobs information portal starter. Desktop content width: 1070px; mobile category panels: two columns; desktop category panels: three columns; page background: #fcfcfc; typography: Source Sans 3.
+Responsive independent information portal for government jobs, results, admit cards, answer keys and education notices.
 
-## Included pages
-- Homepage with categories, search, update cards and navigation
-- Category listing page (`category.html?category=latest-jobs`)
-- Individual update detail page (`detail.html?id=POST_ID`)
-- About, Privacy, Disclaimer, Contact, Terms, Admin, and 404 pages
-- Sitemap and robots.txt
+## Structure
+- `public/` — Cloudflare Pages website.
+- `worker/` — Cloudflare Worker API and D1 migrations.
+- Homepage loads up to 10 latest posts in each category directly from the API.
+- Category routes use clean paths such as `/latest-jobs/` and `/results/`.
+- Post permalinks use title slugs such as `/rrb-ntpc-inter-level-07-2026/`.
+- Old `/category/<slug>/` paths redirect to the corresponding root category route.
+- D1 is additive: migration `0005_post_slugs.sql` adds a slug column and unique index. Existing post rows are retained; slugs are assigned lazily as posts are listed.
 
-## Architecture
-- Cloudflare Pages serves `public/`
-- Cloudflare Worker serves API and scheduled feed sync
-- Cloudflare D1 stores sources and published feed metadata
+## Local website preview (PowerShell)
+From the project root:
+```powershell
+npx.cmd http-server .\public -p 8080
+```
+Open `http://127.0.0.1:8080/index.html`. Keep the PowerShell window open while testing. The Worker CORS code explicitly permits local preview origins on port 8080.
 
-## Deploy frontend
-Connect this GitHub repository to Cloudflare Pages. Build command: leave blank. Build output directory: `public`.
+For local Worker development, use a separate terminal:
+```powershell
+cd worker
+npm ci
+npx.cmd wrangler dev
+```
+Do not run local Worker against production D1 unless you intentionally configure remote bindings.
 
-## Deploy API
-1. Create a Cloudflare D1 database named `go7-gov-db`.
-2. Put its database ID into `worker/wrangler.toml` replacing `REPLACE_WITH_D1_DATABASE_ID`.
-3. In `worker/`, run `npm install`, `npx wrangler login`, `npx wrangler d1 migrations apply go7-gov-db --remote`.
-4. Set secret: `npx wrangler secret put ADMIN_TOKEN` (use a long random secret; never put it in frontend files or GitHub).
-5. Deploy: `npx wrangler deploy`.
-6. Configure Worker custom domain `api.jobs.go7.in`. Set `public/config.js` API_BASE to `https://api.jobs.go7.in` and commit.
-7. Add `jobs.go7.in` as Cloudflare Pages custom domain.
+## Safe deployment order
+Do not deploy until the local Pages preview and API checks pass.
+1. Back up the current Cloudflare Pages deployment and confirm Worker/D1 bindings.
+2. From `worker/`, apply pending additive migrations:
+   `npx.cmd wrangler d1 migrations apply go7-gov-db --remote`
+3. Deploy the Worker:
+   `npx.cmd wrangler deploy`
+4. Deploy only the `public/` directory to the existing Pages project `go7-government-portal` / `go7-government-portal` configured project name as listed in Cloudflare.
+5. Verify homepage category cards, category paths, slug details, old category redirects, admin login and scheduled feed sync.
 
-## Admin
-Open `/admin.html`, enter the ADMIN_TOKEN, add RSS/Atom feeds that you are authorized to use, assign a category, and run Sync Now. Scheduled sync runs every 30 minutes (UTC).
-
-## Publishing and legal scope
-The sync service imports feed metadata (title, short summary, date and original publisher URL). It does not copy complete articles, PDFs, images, or another portal's design/content. Use official department feeds, authorized APIs, or sources whose terms permit this use. Some departments do not offer feeds; they will require manual verification or a separately authorized integration. Automatic publication can contain stale or incomplete feed information, so verify important dates and eligibility against official notices.
-
-## Detail page data limitation
-Current D1 schema stores feed metadata only. Detail pages display that metadata and direct users to the original official/publisher notice for complete vacancy tables, fees, age limits, qualification, salary and application instructions. To display structured fields for every recruitment, extend the admin form and D1 schema with verified fields; do not fabricate missing details.
-
-## Security
-Keep `ADMIN_TOKEN` only as a Worker secret. Do not commit `.dev.vars` or real credentials. Review source feed URLs and comply with their usage terms.
+The migration adds a nullable slug field and index; it does not delete, reset or replace existing posts. Keep `ADMIN_TOKEN` in Cloudflare Worker secrets; never add it to this repository or ZIP.
