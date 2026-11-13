@@ -1,0 +1,4 @@
+# Root-level category pages are static files; unmatched single-segment slugs are post permalinks.
+/category/:slug/ /:slug/ 301
+/category/:slug /:slug/ 301
+/:slug/ /detail.html?slug=:slug 200
