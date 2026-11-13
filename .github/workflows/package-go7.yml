@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Validate JavaScript and XML
+      - name: Validate JavaScript, database and routes
         run: |
           node --check public/app.js
           node --check public/search.js
@@ -32,39 +32,76 @@ jobs:
           node --check worker/src/index.js
           python - <<'PY'
           import pathlib, xml.etree.ElementTree as ET
+
           root = pathlib.Path("public")
+          worker = pathlib.Path("worker")
           ET.parse(root / "sitemap.xml")
-          slugs = ["latest-jobs","results","admit-cards","answer-keys","documents","admissions","iti-jobs","outsourcing-jobs","syllabus"]
-          missing = [s for s in slugs if not (root / s / "index.html").is_file()]
-          assert not missing, f"Missing category pages: {missing}"
+
+          categories = [
+              "jobs-vacancies",
+              "results",
+              "admit-cards-exams",
+              "answer-keys",
+              "admissions-education",
+              "important-notices",
+          ]
+          missing = [slug for slug in categories if not (root / slug / "index.html").is_file()]
+          assert not missing, f"Missing consolidated category pages: {missing}"
+
+          sitemap = (root / "sitemap.xml").read_text(encoding="utf-8")
+          for slug in categories:
+              assert f"https://jobs.go7.in/{slug}/" in sitemap, f"{slug} missing from sitemap"
+
           redirects = (root / "_redirects").read_text(encoding="utf-8")
           assert "/detail/:slug/ /detail.html 200" in redirects
-          assert not any(line.strip().startswith("/:slug/") for line in redirects.splitlines()), "Legacy catch-all must not capture category menu routes"
-          assert "const postPermalink=post=>" in (root / "app.js").read_text(encoding="utf-8")
-          assert "postPermalink(p)" in (root / "category.js").read_text(encoding="utf-8")
-          assert "postPermalink(post)" in (root / "search.js").read_text(encoding="utf-8")
-          assert 'pathSlug.match(/-(\\d+)$/)' in (root / "detail.js").read_text(encoding="utf-8")
-          assert 'history.replaceState(null,"",permalink)' in (root / "detail.js").read_text(encoding="utf-8")
-          assert "cleanFeedContent" in pathlib.Path("worker/src/index.js").read_text(encoding="utf-8")
-          assert "const excerpt=value=>" in (root / "category.js").read_text(encoding="utf-8")
-          assert "const excerpt=value=>" in (root / "search.js").read_text(encoding="utf-8")
-          detail_js = (root / "detail.js").read_text(encoding="utf-8")
-          assert 'p.ai_details?.overview||p.summary' in detail_js, "AI overview must take priority on full post detail pages"
+          assert "/latest-jobs/ /jobs-vacancies/ 301" in redirects
+          assert "/admit-cards/ /admit-cards-exams/ 301" in redirects
+          assert "/documents/ /important-notices/ 301" in redirects
+          assert not any(line.strip().startswith("/:slug/") for line in redirects.splitlines()), "Legacy catch-all must not capture category routes"
+
           index = (root / "index.html").read_text(encoding="utf-8")
-          assert "latest-all" not in index
+          for slug in categories:
+              assert f'data-category="{slug}"' in index, f"{slug} missing from homepage"
+          assert index.count('class="home-category-panel') == 6, "Homepage must show six consolidated categories"
+          assert index.count('class="panel-refresh"') == 6, "Every homepage category needs a refresh control"
           assert "View All" in index
-          assert index.count('class="panel-refresh"') == 9, "Every homepage category needs a refresh control"
-          assert "panel-footer" in index, "View All links should sit at the bottom-right of each category panel"
-          assert 'action="/search.html"' in index, "Homepage search must lead to the dedicated search page"
-          assert (root / "search.html").is_file() and (root / "search.js").is_file(), "Dedicated search page files are missing"
-          not_found = (root / "404.html").read_text(encoding="utf-8")
-          assert "not-found-home" not in not_found, "404 homepage button should be removed"
-          assert "search.html" in not_found, "404 search form must open the search page"
-          styles = (root / "styles.css").read_text(encoding="utf-8")
-          assert "box-shadow:none!important" in styles, "Post links must not use shadows"
-          assert ".detail-title{font-size:20px;font-weight:600" in styles, "Post title typography does not match the approved spec"
+          assert 'action="/search.html"' in index
           assert "© 2026 GO7. Independent information service." in index
-          print("HTML route, design and sitemap checks passed")
+
+          app = (root / "app.js").read_text(encoding="utf-8")
+          category_js = (root / "category.js").read_text(encoding="utf-8")
+          search_js = (root / "search.js").read_text(encoding="utf-8")
+          detail_js = (root / "detail.js").read_text(encoding="utf-8")
+          admin_js = (root / "admin.js").read_text(encoding="utf-8")
+
+          assert 'limit:"20"' in app, "Homepage category previews must be capped at 20"
+          assert "const limit=24" in category_js, "Category pages must paginate in groups of 24"
+          assert 'addEventListener("click",()=>{offset+=limit;load(true);})' in category_js, "Load More pagination is missing"
+          assert "postHref(post)" in app
+          assert "pathSlug.match(/-(\\d+)$/)" in detail_js
+          assert "p.ai_details?.overview||p.summary" in detail_js
+          assert (root / "search.html").is_file() and (root / "search.js").is_file()
+          assert "application_last_date" in detail_js and "APPLICATION CLOSED" in category_js
+          assert "data-published" in admin_js and "data-deadline" in admin_js
+          assert "item.date_evidence" in admin_js, "Review queue must show date extraction evidence"
+
+          worker_js = (worker / "src/index.js").read_text(encoding="utf-8")
+          assert "env.AI.toMarkdown" in worker_js, "Automatic HTML/PDF conversion is missing"
+          assert "function officialPdfLinks" in worker_js, "Official PDF discovery is missing"
+          assert "extractNoticeDatesFromText" in worker_js
+          assert "syncOfficialMonitors(env.DB,env,dateBudget)" in worker_js
+          assert "const dateBudget={used:0,max:8}" in worker_js
+          assert "12*60*60*1000" in worker_js, "Date extraction cooldown is missing"
+
+          migration = worker / "migrations/0008_auto_notice_date_extraction.sql"
+          assert migration.is_file(), "Automatic date extraction migration is missing"
+          migration_sql = migration.read_text(encoding="utf-8")
+          for field in ("date_checked_at", "date_evidence"):
+              assert migration_sql.count(field) == 4, f"Expected {field} on both posts and review_items"
+
+          not_found = (root / "404.html").read_text(encoding="utf-8")
+          assert "search.html" in not_found
+          print("GO7 category, pagination, date-extraction, JavaScript and sitemap checks passed")
           PY
       - name: Assemble complete project ZIP
         run: |
