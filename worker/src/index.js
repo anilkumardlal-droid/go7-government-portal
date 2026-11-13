@@ -231,7 +231,7 @@ const OFFICIAL_MONITORS = [
   {
     name:"ISRO Official Careers",
     category:"latest-jobs",
-    urls:["https://www.isro.gov.in/Careers.html","https://www.isro.gov.in/ViewAllOpportunities.html"],
+    urls:["https://www.isro.gov.in/Careers.html","https://www.isro.gov.in/CurrentOpportunities.html","https://www.isro.gov.in/ViewAllOpportunities.html"],
     hosts:["www.isro.gov.in","isro.gov.in"]
   },
   {
