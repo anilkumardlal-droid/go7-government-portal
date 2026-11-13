@@ -630,6 +630,27 @@ export default {
         },200,corsOrigin);
       }
 
+      const slugMatch=path.match(/^\/api\/posts\/slug\/([a-z0-9-]+)$/);
+      if(slugMatch&&request.method==="GET"){
+        const slug=slugMatch[1];
+        let post=await env.DB.prepare(
+          "SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE slug=? AND status='published'"
+        ).bind(slug).first();
+        if(!post){
+          const candidates=await env.DB.prepare("SELECT id,title,slug FROM posts WHERE status='published'").all();
+          const match=(candidates.results||[]).find(row=>slugify(row.title)===slug&&!row.slug);
+          if(match){
+            await ensurePostSlugs(env.DB,[match]);
+            post=await env.DB.prepare("SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'").bind(match.id).first();
+          }
+        }
+        if(!post)return json({error:"Post not found"},404,corsOrigin);
+        const labelMap=Object.fromEntries(CATEGORIES);
+        let aiDetails=null; try{aiDetails=post.ai_details_json?JSON.parse(post.ai_details_json):null;}catch{}
+        delete post.ai_details_json;
+        return json({post:{...post,ai_details:aiDetails,category_label:labelMap[post.category]||post.category}},200,corsOrigin);
+      }
+
       const detailMatch=path.match(/^\/api\/posts\/(\d+)$/);
 
       if(detailMatch&&request.method==="GET"){
