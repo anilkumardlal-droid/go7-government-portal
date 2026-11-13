@@ -65,6 +65,23 @@ function isConcreteGovtNotice(title, summary = "") {
   return employmentNewsRow || (titleSignals.test(t) && detailSignals.test(s));
 }
 
+// Student-focused notices from official education boards and admission portals.
+// Do not treat generic menus, event news, or admin-only circulars as student notices.
+const EDUCATION_NOTICE_RE =
+  /\\b(?:admissions?|entrance(?:\\s+(?:exam|examination|test))?|counsell?ing|seat allotment|scholarships?|academic session|registration|enrolment|enrollment|exam(?:ination)? form|board examination|board exam|date sheet|time ?table|syllabus|model question|merit list|application form|information bulletin|semester examination|secondary examination|intermediate examination|UGC[- ]?NET|CUET|NEET|JEE|B\\.?Ed|class\\s*(?:[6-9]|10|11|12|ix|x|xi|xii))\\b/i;
+
+function isConcreteEducationNotice(title, summary = "") {
+  const t = clean(title, 500).replace(/\\s+/g, " ").trim();
+  const s = clean(summary, 1600).replace(/\\s+/g, " ").trim();
+  if (!isUsefulNoticeTitle(t) || GENERIC_NAV_TITLE_RE.test(t)) return false;
+  if (/\\b(?:sports fixture|tender|procurement|quotation|photo gallery|celebration|teacher transfer|promotion order|seniority list|office routine|holiday list)\\b/i.test(t)) return false;
+  const combined = t + " " + s;
+  if (!EDUCATION_NOTICE_RE.test(combined)) return false;
+  const action = /\\b(?:notice|notification|inviting|online application|apply|registration|form|schedule|date|extended|extension|allotment|counselling|counseling|result|merit list|admission|entrance|exam|examination|scholarship|syllabus|bulletin|academic session)\\b/i;
+  const detail = /\\b(?:20\\d{2}|class|semester|UG|PG|degree|diploma|school|college|university|board|entrance|admission|exam|examination|last date|online|application|session|CUET|NEET|JEE|B\\.?Ed|UGC)\\b/i;
+  return action.test(t) && (detail.test(t + " " + s) || t.length >= 65);
+}
+
 const json = (data,status=200,origin="*") => new Response(JSON.stringify(data),{
   status,
   headers:{
@@ -624,6 +641,97 @@ const OFFICIAL_MONITORS = [
     parser:"table",
     urls:["https://ossc.gov.in/Public/OSSC/Default.aspx"],
     hosts:["ossc.gov.in","www.ossc.gov.in"]
+  },
+  {
+    name:"Uttar Pradesh UPMSP Education Notices",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://upmsp.edu.in/"],
+    hosts:["upmsp.edu.in","www.upmsp.edu.in"]
+  },
+  {
+    name:"Uttar Pradesh Higher Education Department",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://uphed.gov.in/"],
+    hosts:["uphed.gov.in","www.uphed.gov.in"]
+  },
+  {
+    name:"Bihar Education Department Notices",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://betastate.bihar.gov.in/educationbihar/"],
+    hosts:["betastate.bihar.gov.in"]
+  },
+  {
+    name:"Bihar School Examination Board",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://exam.biharboardonline.org/","https://www.biharboardonline.org/"],
+    hosts:["exam.biharboardonline.org","www.biharboardonline.org"]
+  },
+  {
+    name:"Jharkhand Academic Council Notices",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://jac.jharkhand.gov.in/jac/"],
+    hosts:["jac.jharkhand.gov.in"]
+  },
+  {
+    name:"Jharkhand School Education Department",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://schooleducation.jharkhand.gov.in/"],
+    hosts:["schooleducation.jharkhand.gov.in"]
+  },
+  {
+    name:"West Bengal Higher Education Notices",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://banglaruchchashiksha.wb.gov.in/publications"],
+    hosts:["banglaruchchashiksha.wb.gov.in"]
+  },
+  {
+    name:"West Bengal Higher Secondary Council",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://wbchse.wb.gov.in/home/"],
+    hosts:["wbchse.wb.gov.in"]
+  },
+  {
+    name:"Chhattisgarh School Education Portal",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://eduportal.cg.nic.in/"],
+    hosts:["eduportal.cg.nic.in"]
+  },
+  {
+    name:"Odisha SAMS Admissions",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://degree.samsodisha.gov.in/","https://www.samsodisha.gov.in/Default.aspx"],
+    hosts:["degree.samsodisha.gov.in","www.samsodisha.gov.in","samsodisha.gov.in"]
+  },
+  {
+    name:"National Testing Agency Admissions & Notices",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://www.nta.ac.in/NoticeBoardArchive"],
+    hosts:["www.nta.ac.in","nta.ac.in"]
+  },
+  {
+    name:"CBSE Academic Circulars",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://cbseacademic.nic.in/circulars.html"],
+    hosts:["cbseacademic.nic.in","www.cbseacademic.nic.in"]
+  },
+  {
+    name:"CBSE Examination Notices",
+    category:"admissions-education",
+    parser:"education",
+    urls:["https://www.cbse.gov.in/cbsenew/examination_Circular.html"],
+    hosts:["www.cbse.gov.in","cbse.gov.in"]
   }
 ];
 
@@ -771,6 +879,81 @@ function extractOfficialTableRows(html,pageUrl,monitor){
   return out;
 }
 
+function extractOfficialEducationEntries(html,pageUrl,monitor){
+  const out=[];
+  const seen=new Set();
+  const rows=String(html||"").match(/<tr\\b[^>]*>[\\s\\S]*?<\\/tr>/gi)||[];
+  const dateOnly=/^(?:\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{4}|\\d{4}-\\d{2}-\\d{2})$/;
+
+  const candidateLinks=(row)=>{
+    return [...row.matchAll(/<a\\b([^>]*)>([\\s\\S]*?)<\\/a>/gi)].map(match=>{
+      const label=cleanFeedContent(match[2],180);
+      const href=match[1].match(/\\bhref\\s*=\\s*(["'])(.*?)\\1/i)?.[2];
+      if(!href||/^(?:apply|apply online|click here|read more|view|download|more|login|register)$/i.test(label))return null;
+      try{
+        const target=new URL(decode(href),pageUrl);
+        if(!["http:","https:"].includes(target.protocol)||!monitor.hosts.includes(target.hostname.toLowerCase()))return null;
+        return {url:target.href,label,priority:/\\.pdf(?:$|[?#])/i.test(target.href)?0:1};
+      }catch{return null;}
+    }).filter(Boolean).sort((a,b)=>a.priority-b.priority);
+  };
+
+  const add=(title,summary,link,dateText="")=>{
+    title=clean(title,220);
+    if(!title||!link||seen.has(link+"|"+title))return;
+    if(!isConcreteEducationNotice(title,summary)&&!isConcreteGovtNotice(title,summary))return;
+    let target;
+    try{target=new URL(link);}catch{return;}
+    if(!monitor.hosts.includes(target.hostname.toLowerCase()))return;
+    seen.add(link+"|"+title);
+    out.push({
+      title,link,guid:link+"|"+title,
+      summary:clean(summary,1200),
+      publishedAt:dateText?parseOfficialDate(dateText):null,
+      applicationLastDate:null
+    });
+  };
+
+  for(const row of rows){
+    const cells=[...row.matchAll(/<(td|th)\\b[^>]*>([\\s\\S]*?)<\\/\\1>/gi)]
+      .map(match=>cleanFeedContent(match[2],900)).filter(Boolean);
+    if(cells.length<2)continue;
+    const rowText=clean(cells.join(" | "),1500);
+    const titleCells=cells.filter(cell=>!dateOnly.test(cell.trim())&&!/^\\d{1,4}$/.test(cell.trim())&&
+      !/^(?:apply|apply online|click here|read more|view|download|more|login|register)$/i.test(cell.trim()));
+    const linkedTitle=candidateLinks(row).map(x=>x.label).find(label=>
+      isConcreteEducationNotice(label,rowText)||isConcreteGovtNotice(label,rowText)
+    );
+    const title=linkedTitle||titleCells.find(cell=>
+      isConcreteEducationNotice(cell,rowText)||isConcreteGovtNotice(cell,rowText)
+    )||titleCells.slice(0,2).join(" - ");
+    const link=candidateLinks(row)[0]?.url||"";
+    const dateText=rowText.match(/\\b(?:\\d{1,2}[-\\/.][A-Za-z]{3}[-\\/.]20\\d{2}|\\d{1,2}[-\\/.]\\d{1,2}[-\\/.]20\\d{2}|20\\d{2}-\\d{2}-\\d{2})\\b/i)?.[0]||"";
+    add(title,rowText,link,dateText);
+    if(out.length>=20)break;
+  }
+
+  // Card/list-style portals (e.g. notice boards without an HTML table).
+  if(out.length<20){
+    const anchors=[...String(html||"").matchAll(/<a\\b([^>]*)>([\\s\\S]*?)<\\/a>/gi)];
+    for(const match of anchors){
+      const label=cleanFeedContent(match[2],220);
+      if(!label)continue;
+      const href=match[1].match(/\\bhref\\s*=\\s*(["'])(.*?)\\1/i)?.[2];
+      if(!href)continue;
+      try{
+        const target=new URL(decode(href),pageUrl);
+        if(!["http:","https:"].includes(target.protocol)||!monitor.hosts.includes(target.hostname.toLowerCase()))continue;
+        const at=match.index||0;
+        const context=cleanFeedContent(String(html||"").slice(Math.max(0,at-450),Math.min(String(html||"").length,at+750)),1000);
+        add(label,context,target.href);
+      }catch{}
+      if(out.length>=20)break;
+    }
+  }
+  return out;
+}
+
 async function fetchOfficialMonitor(monitor){
   const failures=[];
 
@@ -805,6 +988,8 @@ async function fetchOfficialMonitor(monitor){
       }else if(monitor.parser==="table"){
         entries=extractOfficialTableRows(html,pageUrl,monitor);
         if(!entries.length)entries=extractOfficialLinks(html,pageUrl,monitor);
+      }else if(monitor.parser==="education"){
+        entries=extractOfficialEducationEntries(html,pageUrl,monitor);
       }else{
         entries=extractOfficialLinks(html,pageUrl,monitor);
       }
@@ -883,7 +1068,9 @@ async function syncOfficialMonitors(db,env,dateBudget){
       let host="";
       try{host=new URL(sourceUrl).hostname.toLowerCase();}catch{}
       // Only the exact official hosts configured for this monitor may publish.
-      if(!title||!safeHttpUrl(sourceUrl)||!monitor.hosts.includes(host)||!isConcreteGovtNotice(title,item.summary||"")){
+      const validNotice=isConcreteGovtNotice(title,item.summary||"")||
+        (monitor.category==="admissions-education"&&isConcreteEducationNotice(title,item.summary||""));
+      if(!title||!safeHttpUrl(sourceUrl)||!monitor.hosts.includes(host)||!validNotice){
         skipped++;
         continue;
       }
