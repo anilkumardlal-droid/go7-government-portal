@@ -40,9 +40,9 @@ jobs:
           assert "/detail/:slug/ /detail.html?slug=:slug 200" in redirects
           assert "/latest-jobs/ /latest-jobs/index.html 200" in redirects
           assert not any(line.strip().startswith("/:slug/") for line in redirects.splitlines()), "Legacy catch-all must not capture category menu routes"
-          assert '"/detail/"+encodeURIComponent(base+"-"+post.id)+"/"' in (root / "app.js").read_text(encoding="utf-8")
-          assert '"/detail/"+encodeURIComponent(base+"-"+p.id)+"/"' in (root / "category.js").read_text(encoding="utf-8")
-          assert '"/detail/"+encodeURIComponent(base+"-"+post.id)+"/"' in (root / "search.js").read_text(encoding="utf-8")
+          assert "const postPermalink=post=>" in (root / "app.js").read_text(encoding="utf-8")
+          assert "postPermalink(p)" in (root / "category.js").read_text(encoding="utf-8")
+          assert "postPermalink(post)" in (root / "search.js").read_text(encoding="utf-8")
           assert 'pathSlug.match(/-(\\d+)$/)' in (root / "detail.js").read_text(encoding="utf-8")
           assert 'history.replaceState(null,"",permalink)' in (root / "detail.js").read_text(encoding="utf-8")
           assert "cleanFeedContent" in pathlib.Path("worker/src/index.js").read_text(encoding="utf-8")
