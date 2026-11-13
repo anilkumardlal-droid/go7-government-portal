@@ -412,3 +412,9 @@ body{font-size:14px}
 @media(max-width:390px){
  .header-search{font-size:14px}
 }
+
+
+/* Latest user adjustments: compact footer and remove header search link */
+.site-footer{padding:10px}
+@media(max-width:760px){.site-footer{padding:10px}}
+.header-search{display:none!important}
