@@ -44,7 +44,7 @@
    const data=await r.json();
    const posts=(data.posts||[]).filter(item=>Number(item.id)!==Number(current.id)).slice(0,4);
    if(!posts.length){section.hidden=true;return;}
-   target.innerHTML=posts.map(item=>'<article class="related-post-card"><div class="post-meta"><span class="pill">'+esc(item.category_label||item.category||"Update")+'</span><span>'+esc(date(item.published_at))+'</span></div><h3><a href="/detail.html?id='+encodeURIComponent(item.id)+'">'+esc(item.title||"Government Update")+'</a></h3><p>'+esc(excerpt(item.summary||"Open the official notification for full information."))+'</p></article>').join("");
+   target.innerHTML=posts.map(item=>'<article class="related-post-card"><h3><a href="/detail.html?id='+encodeURIComponent(item.id)+'">'+esc(item.title||"Government Update")+'</a></h3></article>').join("");
    section.hidden=false;
   }catch(error){
    section.hidden=true;
