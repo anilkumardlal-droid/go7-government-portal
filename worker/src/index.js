@@ -827,7 +827,7 @@ export default {
         }
 
         if (path === "/api/admin/ai/pending" && request.method === "GET") {
-          const rows = await env.DB.prepare("SELECT id,title,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts WHERE status='published' AND category='latest-jobs' ORDER BY created_at DESC LIMIT 50").all();
+          const rows = await env.DB.prepare("SELECT id,title,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts WHERE status='published' AND category='jobs-vacancies' ORDER BY created_at DESC LIMIT 50").all();
           return json({ items: rows.results || [] }, 200, corsOrigin);
         }
 
