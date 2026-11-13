@@ -483,3 +483,49 @@ body{font-size:14px}
  font-size:12px;
  line-height:1.6;
 }
+
+
+/* User-requested category and search title-only list; related updates stay as cards */
+.category-post-grid,
+.search-result-list{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+.category-post-card,
+.search-result-card{
+  min-width:0;
+  padding:9px 0;
+  border:0;
+  border-bottom:1px solid var(--line);
+  border-radius:0;
+  background:transparent;
+}
+.category-post-card h2,
+.search-result-card h2{
+  margin:0;
+  font-size:14px;
+  font-weight:500;
+  line-height:1.5;
+}
+.category-post-card h2 a,
+.search-result-card h2 a{
+  display:block;
+  color:#0000ef;
+  text-decoration-line:underline;
+  text-decoration-color:blue;
+  text-underline-offset:2px;
+  overflow-wrap:anywhere;
+}
+.category-post-card h2 a:hover,
+.search-result-card h2 a:hover{
+  color:#0000ef;
+  text-decoration-color:blue;
+}
+.related-post-card h3{margin:0}
+.related-post-card h3 a{
+  color:#0000ef;
+  text-decoration-line:underline;
+  text-decoration-color:blue;
+  text-underline-offset:2px;
+}
