@@ -173,3 +173,15 @@ button,input,select,textarea{font:inherit}
  .site-footer{width:calc(100% - 24px);margin-bottom:8px}
 }
 @media(max-width:380px){.home-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.panel-head{align-items:flex-start;flex-direction:column}.view-all{align-self:flex-start}.quick-links{gap:6px}}
+
+/* Informational and 404 pages */
+.content-card,.not-found-card{padding:22px;background:#fff;border:1px solid var(--line);border-radius:9px}
+.content-card h1,.not-found-card h1{margin:0 0 10px;color:var(--navy);font-size:25px}
+.content-card h2{margin:15px 0 6px;color:var(--navy);font-size:16px}
+.content-card p,.not-found-card p{color:#59687d;font-size:12px;line-height:1.75}
+.content-card a{color:var(--link);text-decoration:underline;text-decoration-color:blue}
+.not-found-card{max-width:760px;margin:12px auto;text-align:center}
+.not-found-search{display:flex;gap:8px;max-width:520px;margin:18px auto}
+.not-found-search input{flex:1;min-width:0;padding:11px;border:1px solid #d7dee8;border-radius:5px}
+.not-found-search button,.not-found-home{padding:10px 15px;border:0;border-radius:5px;background:var(--navy);color:#fff;text-decoration:none;font-weight:700;cursor:pointer}
+.not-found-home{display:inline-flex}
