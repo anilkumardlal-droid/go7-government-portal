@@ -22,11 +22,13 @@ $("add").onclick=async()=>{
 };
 
 $("sync").onclick = async () => {
+  const button=$("sync");
+  button.disabled=true;
+  button.classList.add("is-loading");
+  button.textContent="Syncing RSS feeds…";
   try {
-    say("Syncing RSS feeds…");
-
+    say("Checking configured RSS feeds and official notices…");
     const d = await call("/api/admin/sync", "POST", {});
-
     say(
       `Sync completed: ${d.sources_checked || 0} sources checked, ` +
       `${d.inserted || 0} new posts, ` +
@@ -34,9 +36,12 @@ $("sync").onclick = async () => {
       `Pending official notices for review: ${d.review_pending || 0}. ` +
       `Errors: ${(d.errors || []).join(" | ") || "None"}`
     );
-
   } catch (e) {
     say("Sync failed: " + e.message);
+  } finally {
+    button.disabled=false;
+    button.classList.remove("is-loading");
+    button.textContent="Sync RSS feeds";
   }
 };
 
