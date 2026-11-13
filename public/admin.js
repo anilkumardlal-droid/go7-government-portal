@@ -35,7 +35,8 @@ $("sync").onclick = async () => {
       `Sync completed: ${d.sources_checked || 0} sources checked, ` +
       `${d.inserted || 0} new items, ` +
       `${d.skipped || 0} already existing. ` +
-      `Dates auto-read from ${d.date_extraction?.checked || 0} official pages/PDFs in this run (maximum ${d.date_extraction?.limit || 8}); remaining items continue on later syncs. ` +
+      `Government monitors checked: ${d.official?.checked || 0}/${d.official?.total || 0} in this run; ${d.official?.remaining || 0} will rotate through later syncs. ` +
+      `Dates auto-read from ${d.date_extraction?.checked || 0} official pages/PDFs in this run (maximum ${d.date_extraction?.limit || 2}); remaining items continue on later syncs. ` +
       `Pending official notices for review: ${d.review_pending || 0}. ` +
       `Errors: ${(d.errors || []).join(" | ") || "None"}`
     );
