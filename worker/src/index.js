@@ -412,7 +412,8 @@ async function fetchFeed(source,env){
 }
 
 
-// Official government recruitment pages
+// Official government recruitment pages. Native RSS is used only where the department publishes one;
+// the remaining pages are monitored directly and their notices enter the Admin Review Queue.
 const OFFICIAL_MONITORS = [
   {
     name:"Employment News - Jobs",
@@ -436,29 +437,121 @@ const OFFICIAL_MONITORS = [
   {
     name:"UPSC Official Recruitment",
     category:"jobs-vacancies",
-    urls:[
-      "https://www.upsc.gov.in/recruitment/recruitment-advertisement",
-      "https://cms.upsc.gov.in/archived-advertisements/"
-    ],
+    urls:["https://www.upsc.gov.in/recruitment/recruitment-advertisement","https://cms.upsc.gov.in/archived-advertisements/"],
     hosts:["www.upsc.gov.in","upsc.gov.in","cms.upsc.gov.in"]
   },
   {
-    name:"SSC Official Notices",
+    name:"SSC Official Notice Board",
     category:"jobs-vacancies",
-    urls:[
-      "https://ssc.gov.in/",
-      "https://ssccr.gov.in/announcements"
-    ],
-    hosts:["ssc.gov.in","www.ssc.gov.in","ssccr.gov.in"]
+    urls:["https://ssc.gov.in/home/notice-board","https://ssc.gov.in/"],
+    hosts:["ssc.gov.in","www.ssc.gov.in"]
   },
   {
-    name:"Railway RRB Employment Notices",
+    name:"Railway RRB Unified Portal",
     category:"jobs-vacancies",
-    urls:[
-      "https://www.rrbcdg.gov.in/employment-notices.php",
-      "https://rrbahmedabad.gov.in/exams/"
-    ],
-    hosts:["www.rrbcdg.gov.in","rrbcdg.gov.in","rrbahmedabad.gov.in"]
+    urls:["https://rrb.indianrailways.gov.in/"],
+    hosts:["rrb.indianrailways.gov.in","www.rrb.indianrailways.gov.in"]
+  },
+  {
+    name:"UPPSC Notifications",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://uppsc.up.nic.in/CandidatePages/Notifications.aspx"],
+    hosts:["uppsc.up.nic.in"]
+  },
+  {
+    name:"UPSSSC Official Notices",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://upsssc.gov.in/"],
+    hosts:["upsssc.gov.in","www.upsssc.gov.in"]
+  },
+  {
+    name:"Uttar Pradesh Police Recruitment Board",
+    category:"jobs-vacancies",
+    urls:["https://uppbpb.gov.in/Home/Notice","https://uppbpb.gov.in/"],
+    hosts:["uppbpb.gov.in","www.uppbpb.gov.in"]
+  },
+  {
+    name:"Bihar BPSC Notices",
+    category:"jobs-vacancies",
+    urls:["https://bpsc.bihar.gov.in/"],
+    hosts:["bpsc.bihar.gov.in","www.bpsc.bihar.gov.in"]
+  },
+  {
+    name:"Bihar BSSC Notice Board",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://bssc.bihar.gov.in/NoticeBoard.htm"],
+    hosts:["bssc.bihar.gov.in"]
+  },
+  {
+    name:"Bihar BPSSC Notices",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://bpssc.bihar.gov.in/Notices.htm","https://bpssc.bihar.gov.in/"],
+    hosts:["bpssc.bihar.gov.in"]
+  },
+  {
+    name:"Bihar CSBC Police Recruitment",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://csbc.bihar.gov.in/"],
+    hosts:["csbc.bihar.gov.in","www.csbc.bihar.gov.in"]
+  },
+  {
+    name:"Jharkhand JPSC Recruitment",
+    category:"jobs-vacancies",
+    urls:["https://jpsc.gov.in/","https://jpsc.gov.in/circular_notices.php"],
+    hosts:["jpsc.gov.in","www.jpsc.gov.in"]
+  },
+  {
+    name:"Jharkhand JSSC Notices",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://jssc.nic.in/"],
+    hosts:["jssc.nic.in","www.jssc.nic.in"]
+  },
+  {
+    name:"West Bengal PSC Notices",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://psc.wb.gov.in/notification_announcement.jsp","https://psc.wb.gov.in/"],
+    hosts:["psc.wb.gov.in","www.psc.wb.gov.in"]
+  },
+  {
+    name:"Chhattisgarh PSC Notifications",
+    category:"jobs-vacancies",
+    urls:["https://psc.cg.gov.in/Notifications.php","https://psc.cg.gov.in/Advertisement.php"],
+    hosts:["psc.cg.gov.in","www.psc.cg.gov.in"]
+  },
+  {
+    name:"Chhattisgarh Vyapam",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://vyapam.cgstate.gov.in/"],
+    hosts:["vyapam.cgstate.gov.in"]
+  },
+  {
+    name:"Odisha OPSC Notices",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://opsc.gov.in/Public/OPSC/Default.aspx"],
+    hosts:["opsc.gov.in","www.opsc.gov.in"]
+  },
+  {
+    name:"Odisha OSSSC Recruitment",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://osssc.gov.in/Public/OSSSC/Default.aspx"],
+    hosts:["osssc.gov.in","www.osssc.gov.in"]
+  },
+  {
+    name:"Odisha OSSC Notices",
+    category:"jobs-vacancies",
+    parser:"table",
+    urls:["https://ossc.gov.in/Public/OSSC/Default.aspx"],
+    hosts:["ossc.gov.in","www.ossc.gov.in"]
   }
 ];
 
@@ -565,6 +658,53 @@ function extractEmploymentNewsRows(html,pageUrl,monitor){
 
 
 
+function extractOfficialTableRows(html,pageUrl,monitor){
+  const out=[];
+  const seen=new Set();
+  const rows=String(html||"").match(/<tr\\b[^>]*>[\\s\\S]*?<\\/tr>/gi)||[];
+
+  for(const row of rows){
+    const cells=[...row.matchAll(/<(td|th)\\b[^>]*>([\\s\\S]*?)<\\/\\1>/gi)]
+      .map(match=>cleanFeedContent(match[2],1200))
+      .filter(Boolean);
+    if(cells.length<2)continue;
+
+    const rowText=cells.join(" ");
+    if(IGNORE_RE.test(rowText))continue;
+    const title=clean(cells.slice(1).join(" - "),220);
+    if(!isUsefulNoticeTitle(title)||!RECRUITMENT_RE.test(title))continue;
+
+    const hrefs=[...row.matchAll(/<a\\b[^>]*href\\s*=\\s*(["'])(.*?)\\1/gi)];
+    let link="";
+    for(const match of hrefs){
+      try{
+        const target=new URL(decode(match[2]),pageUrl);
+        if(["http:","https:"].includes(target.protocol)&&monitor.hosts.includes(target.hostname.toLowerCase())){
+          link=target.href;
+          break;
+        }
+      }catch{}
+    }
+    // Only ingest a row when it points to a document/page on the same official institution.
+    if(!link)continue;
+
+    const key=link+"|"+title;
+    if(seen.has(key))continue;
+    seen.add(key);
+    const dateMatch=rowText.match(/\\b\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{4}\\b/);
+    out.push({
+      title,
+      link,
+      guid:key,
+      summary:clean(rowText,1200),
+      publishedAt:dateMatch?parseOfficialDate(dateMatch[0]):null,
+      applicationLastDate:null
+    });
+    if(out.length>=12)break;
+  }
+  return out;
+}
+
 async function fetchOfficialMonitor(monitor){
   const failures=[];
 
@@ -595,7 +735,11 @@ async function fetchOfficialMonitor(monitor){
 
       const entries=monitor.parser==="employment-jobs"
         ?extractEmploymentNewsRows(html,pageUrl,monitor)
-        :extractOfficialLinks(html,pageUrl,monitor);
+        :monitor.parser==="table"
+          ?(extractOfficialTableRows(html,pageUrl,monitor).length
+            ?extractOfficialTableRows(html,pageUrl,monitor)
+            :extractOfficialLinks(html,pageUrl,monitor))
+          :extractOfficialLinks(html,pageUrl,monitor);
 
 if(entries.length){
   return {
