@@ -4,7 +4,7 @@
  const $=id=>document.getElementById(id);const limit=24;let offset=0,loading=false;
  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const date=s=>{if(!s)return"Recently added";const d=new Date(s);return Number.isNaN(d.getTime())?"Recently added":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});};
- const href=p=>p.slug?"/"+encodeURIComponent(p.slug)+"/":"/detail.html?id="+encodeURIComponent(p.id);
+ const href=p=>p.slug?"/detail/"+encodeURIComponent(p.slug)+"/":"/detail.html?id="+encodeURIComponent(p.id);
  const isNewPost=p=>{const value=p?.created_at||p?.published_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
  const newBadge=p=>isNewPost(p)?'<span class="new-post-badge" aria-label="New post">NEW</span> ':"";
  function render(posts,append){const html=posts.map(p=>`<article class="category-post-card"><div class="post-meta"><span class="pill">${esc(p.category_label||p.category||"Update")}</span><span>${esc(date(p.published_at||p.created_at))}</span></div><h2>${newBadge(p)}${esc(p.title||"Government Update")}</h2><p>${esc(p.summary||"Open the official notification for full information.")}</p><a href="${href(p)}">View details →</a></article>`).join("");if(append)$("postList").insertAdjacentHTML("beforeend",html);else $("postList").innerHTML=html;}
