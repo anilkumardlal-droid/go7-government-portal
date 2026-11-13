@@ -13,6 +13,8 @@ async function loadSources(){
   catch(e){say(e.message);}
 }
 function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+const dateInputValue=value=>{if(!value)return"";const match=String(value).match(/^(\d{4}-\d{2}-\d{2})/);if(match)return match[1];const d=new Date(value);return Number.isNaN(d.getTime())?"":new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);};
+const indiaToday=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 
 
 $("loadSources").onclick=loadSources;
@@ -56,7 +58,21 @@ async function loadReview(){
     const d=await call("/api/admin/review");
     const items=d.items||[];
     if(!items.length){$("review").textContent="No notices are waiting for review.";return;}
-    $("review").innerHTML=items.map(item=>`<div class="source-row"><b>${escapeHtml(item.title)}</b> · ${escapeHtml(item.category)}<br><small>${escapeHtml(item.source_name)} · ${escapeHtml(item.detected_at||"")}</small><br><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener">Open official notice</a><br><button type="button" data-approve="${item.id}" class="primary">Approve & publish</button> <button type="button" data-dismiss="${item.id}" class="secondary">Dismiss</button></div>`).join("");
+    $("review").innerHTML=items.map(item=>{
+      const pub=dateInputValue(item.published_at);
+      const deadline=dateInputValue(item.application_last_date);
+      const expired=Boolean(deadline&&deadline<indiaToday());
+      return `<div class="source-row" data-review-card="${item.id}">
+        <b>${escapeHtml(item.title)}</b> · ${escapeHtml(item.category)}
+        <br><small>${escapeHtml(item.source_name)} · Detected by GO7: ${escapeHtml(item.detected_at||"unknown")} (this is not the notice publication date)</small>
+        <br><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener">Open official notice</a>
+        ${expired?'<p><strong>APPLICATION CLOSED — archive notice</strong></p>':""}
+        <div class="field"><label>Official publication date (enter from the notice)</label><input type="date" data-published value="${pub}"></div>
+        <div class="field"><label>Application last date (if applicable)</label><input type="date" data-deadline value="${deadline}"></div>
+        <small>${expired?"The deadline has passed. Approving will publish it as a closed/archived notice.":deadline?"Application deadline is recorded.":"Check the official notice for its original publication date and deadline. Leave a date blank only when the source does not provide it."}</small>
+        <br><button type="button" data-approve="${item.id}" class="primary">Approve & publish</button> <button type="button" data-dismiss="${item.id}" class="secondary">Dismiss</button>
+      </div>`;
+    }).join("");
   }catch(e){say(e.message);}
 }
 
@@ -68,7 +84,12 @@ $("review").addEventListener("click",async event=>{
   if(!button)return;
   const id=button.getAttribute(approve?"data-approve":"data-dismiss");
   try{
-    const d=await call(`/api/admin/review/${id}/${approve?"approve":"dismiss"}`,"POST",{});
+    const card=button.closest("[data-review-card]");
+    const body=approve?{
+      published_at:card?.querySelector("[data-published]")?.value||"",
+      application_last_date:card?.querySelector("[data-deadline]")?.value||""
+    }:{};
+    const d=await call(`/api/admin/review/${id}/${approve?"approve":"dismiss"}`,"POST",body);
     say(d.message||"Review updated.");
     await loadReview();
   }catch(e){say(e.message);}
