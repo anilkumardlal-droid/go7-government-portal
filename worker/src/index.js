@@ -837,8 +837,7 @@ async function syncOfficialMonitors(db,env,dateBudget){
   );
   const nextCursor=(cursor+monitors.length)%OFFICIAL_MONITORS.length;
 
-  // Advance before fetching: a single slow/unavailable source must not pin the
-  // rotation on the same batch during every scheduled run.
+  // Advance before fetching: one slow/unavailable site must not pin rotation.
   await db.prepare(
     "INSERT INTO sync_state(state_key,state_value) VALUES('official_monitor_cursor',?) " +
     "ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value,updated_at=CURRENT_TIMESTAMP"
@@ -857,8 +856,18 @@ async function syncOfficialMonitors(db,env,dateBudget){
     await db.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'ok',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL) ON CONFLICT(source_name) DO UPDATE SET status='ok',last_checked_at=CURRENT_TIMESTAMP,last_success_at=CURRENT_TIMESTAMP,last_error=NULL").bind(monitor.name).run();
 
     for(const item of result.entries){
-      const fingerprint=("official-page|"+item.link+"|"+item.title).slice(0,900);
-      const duplicate=await db.prepare("SELECT id,published_at,application_last_date,date_checked_at,date_evidence FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+      const title=clean(item.title,220);
+      const sourceUrl=String(item.link||"").trim();
+      let host="";
+      try{host=new URL(sourceUrl).hostname.toLowerCase();}catch{}
+      // Only the exact official hosts configured for this monitor may publish.
+      if(!title||!safeHttpUrl(sourceUrl)||!monitor.hosts.includes(host)||!isUsefulNoticeTitle(title)){
+        skipped++;
+        continue;
+      }
+
+      const fingerprint=("official-page|"+sourceUrl+"|"+title).slice(0,900);
+      const duplicate=await db.prepare("SELECT id,published_at,application_last_date,date_checked_at,date_evidence FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(title).first();
       const existingReview=await db.prepare("SELECT id,published_at,application_last_date,date_checked_at,date_evidence FROM review_items WHERE fingerprint=? AND status='pending'").bind(fingerprint).first();
       const current=existingReview||duplicate;
       let automatic=null;
@@ -866,49 +875,52 @@ async function syncOfficialMonitors(db,env,dateBudget){
       if(hasMissingDate&&dateCheckIsDue(current?.date_checked_at)&&dateBudget.used<dateBudget.max){
         dateBudget.used++;
         dateChecks++;
-        automatic=await extractOfficialNoticeDates(env,item.link);
+        automatic=await extractOfficialNoticeDates(env,sourceUrl);
       }
+
       const publishedAt=item.publishedAt||automatic?.publishedAt||null;
       const applicationLastDate=item.applicationLastDate||automatic?.applicationLastDate||null;
       const checkedAt=automatic?.checkedAt||(item.publishedAt||item.applicationLastDate?new Date().toISOString():null);
       const evidence=automatic?.evidence||(item.publishedAt||item.applicationLastDate?"Date read from the official listing page.":null);
+      const category=detectCategory(title,item.summary||"")||monitor.category||"jobs-vacancies";
+      if(!CATEGORY_SET.has(category)){
+        skipped++;
+        continue;
+      }
 
+      let publishedNow=false;
       if(duplicate){
         await db.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?),date_checked_at=COALESCE(?,date_checked_at),date_evidence=COALESCE(?,date_evidence) WHERE id=?")
           .bind(publishedAt,applicationLastDate,checkedAt,evidence,duplicate.id).run();
-      }
-      if(existingReview){
-        await db.prepare("UPDATE review_items SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?),date_checked_at=COALESCE(?,date_checked_at),date_evidence=COALESCE(?,date_evidence) WHERE id=?")
-          .bind(publishedAt,applicationLastDate,checkedAt,evidence,existingReview.id).run();
         skipped++;
-        continue;
-      }
-      if(duplicate){
-        skipped++;
-        continue;
+      }else{
+        const summary=clean(item.summary||(`Official update listed by ${monitor.name}. Open the official source for complete details.`),1200);
+        const slug=await createUniqueSlug(db,title);
+        const write=await db.prepare(`
+          INSERT OR IGNORE INTO posts
+          (guid,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,status,ai_extraction_status,slug)
+          VALUES(?,?,?,?,?,?,?,?,?,?,'published','pending',?)
+        `).bind(
+          fingerprint,title,summary,category,monitor.name,sourceUrl,
+          publishedAt,applicationLastDate,checkedAt,evidence,slug
+        ).run();
+        if(write.meta?.changes){
+          inserted++;
+          publishedNow=true;
+        }else{
+          skipped++;
+        }
       }
 
-      const write=await db.prepare(`
-        INSERT OR IGNORE INTO review_items
-        (fingerprint,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,status)
-        VALUES(?,?,?,?,?,?,?,?,?,?, 'pending')
-      `).bind(
-        fingerprint,
-        item.title,
-        clean(item.summary||"",1200),
-        (detectCategory(item.title,item.summary||"")||monitor.category||"jobs-vacancies"),
-        monitor.name,
-        item.link,
-        publishedAt,
-        applicationLastDate,
-        checkedAt,
-        evidence
-      ).run();
-      if(write.meta?.changes)inserted++;
-      else skipped++;
+      // Close a legacy pending item only after the same notice is found again
+      // on its configured official source and exists as a published post.
+      if(existingReview&&(duplicate||publishedNow)){
+        await db.prepare("UPDATE review_items SET status='approved',published_at=COALESCE(?,published_at),application_last_date=COALESCE(?,application_last_date),date_checked_at=COALESCE(?,date_checked_at),date_evidence=COALESCE(?,date_evidence) WHERE id=?")
+          .bind(publishedAt,applicationLastDate,checkedAt,evidence,existingReview.id).run();
+      }
     }
   }
-  return {checked:monitors.length,total:OFFICIAL_MONITORS.length,inserted,skipped,date_checks:dateChecks,errors};
+  return {checked:monitors.length,total:OFFICIAL_MONITORS.length,inserted,auto_published:inserted,skipped,date_checks:dateChecks,errors};
 }
 
 /* MAIN SYNC SYSTEM */
@@ -985,7 +997,7 @@ async function syncAll(env){
     sources_checked:(sources.results?.length||0)+officialResult.checked,
     review_pending:pendingCount?.total||0,
     rss:{inserted:rssInserted,skipped:rssSkipped},
-    official:{checked:officialResult.checked,total:officialResult.total||OFFICIAL_MONITORS.length,inserted:officialResult.inserted,skipped:officialResult.skipped,remaining:Math.max(0,(officialResult.total||OFFICIAL_MONITORS.length)-officialResult.checked)},
+    official:{checked:officialResult.checked,total:officialResult.total||OFFICIAL_MONITORS.length,inserted:officialResult.inserted,auto_published:officialResult.auto_published||0,skipped:officialResult.skipped,remaining:Math.max(0,(officialResult.total||OFFICIAL_MONITORS.length)-officialResult.checked)},
     date_extraction:{checked:dateBudget.used,limit:dateBudget.max,pending_next_sync:Math.max(0,officialResult.inserted+officialResult.skipped-dateBudget.used)},
     inserted:rssInserted+officialResult.inserted,
     skipped:rssSkipped+officialResult.skipped,
@@ -1347,42 +1359,6 @@ export default {
             "SELECT id,title,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,detected_at FROM review_items WHERE status='pending' ORDER BY detected_at DESC LIMIT 100"
           ).all();
           return json({items:rows.results||[]},200,corsOrigin);
-        }
-
-        const reviewMatch=path.match(/^\/api\/admin\/review\/(\d+)\/(approve|dismiss)$/);
-        if(reviewMatch&&request.method==="POST"){
-          const id=Number(reviewMatch[1]);
-          const action=reviewMatch[2];
-          const item=await env.DB.prepare(
-            "SELECT * FROM review_items WHERE id=? AND status='pending'"
-          ).bind(id).first();
-          if(!item) return json({error:"Review item not found or already processed."},404,corsOrigin);
-          if(action==="approve"){
-            let host="";
-            try{host=new URL(item.source_url).hostname;}catch{}
-            if(!isOfficialHost(host)||!isUsefulNoticeTitle(item.title)) return json({error:"Notice title or source link failed the official-source checks."},400,corsOrigin);
-            const approvalBody=await request.json().catch(()=>({}));
-            const rawPublished=String(approvalBody.published_at||"").trim();
-            const rawDeadline=String(approvalBody.application_last_date||"").trim();
-            const publishedAt=rawPublished?parseOfficialDate(rawPublished):(item.published_at||null);
-            const applicationLastDate=rawDeadline?parseOfficialDate(rawDeadline):(item.application_last_date||null);
-            if(rawPublished&&!publishedAt)return json({error:"Enter a valid official publication date (DD/MM/YYYY or YYYY-MM-DD)."},400,corsOrigin);
-            if(rawDeadline&&!applicationLastDate)return json({error:"Enter a valid application last date (DD/MM/YYYY or YYYY-MM-DD)."},400,corsOrigin);
-            const duplicate=await env.DB.prepare("SELECT id,published_at,application_last_date,date_checked_at,date_evidence FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
-            if(!duplicate){
-              const slug=await createUniqueSlug(env.DB,item.title);
-              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,?,?,?,?, 'published','pending',?)`)
-                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "jobs-vacancies"),item.source_name,item.source_url,publishedAt,applicationLastDate,item.date_checked_at||null,item.date_evidence||null,slug).run();
-            }else if((publishedAt&&!duplicate.published_at)||(applicationLastDate&&!duplicate.application_last_date)||(item.date_checked_at&&!duplicate.date_checked_at)){
-              await env.DB.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?),date_checked_at=COALESCE(date_checked_at,?),date_evidence=COALESCE(date_evidence,?) WHERE id=?")
-                .bind(publishedAt,applicationLastDate,item.date_checked_at||null,item.date_evidence||null,duplicate.id).run();
-            }
-            await env.DB.prepare("UPDATE review_items SET status='approved',published_at=COALESCE(?,published_at),application_last_date=COALESCE(?,application_last_date) WHERE id=?")
-              .bind(publishedAt,applicationLastDate,id).run();
-            return json({ok:true,message:duplicate?"Duplicate notice skipped; review item closed.":"Official notice approved and published."},200,corsOrigin);
-          }
-          await env.DB.prepare("UPDATE review_items SET status='dismissed' WHERE id=?").bind(id).run();
-          return json({ok:true,message:"Notice dismissed."},200,corsOrigin);
         }
 
         if(path==="/api/admin/sync"&&request.method==="POST"){
