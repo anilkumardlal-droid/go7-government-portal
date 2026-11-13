@@ -584,8 +584,8 @@ const OFFICIAL_MONITORS = [
     name:"Bihar CSBC Police Recruitment",
     category:"jobs-vacancies",
     parser:"table",
-    urls:["https://csbc.bihar.gov.in/"],
-    hosts:["csbc.bihar.gov.in","www.csbc.bihar.gov.in"]
+    urls:["https://csbc-bih.bihar.gov.in/notifications","https://csbc-bih.bihar.gov.in/","https://csbc.bihar.gov.in/"],
+    hosts:["csbc-bih.bihar.gov.in","csbc.bihar.gov.in","www.csbc.bihar.gov.in"]
   },
   {
     name:"Jharkhand State Recruitment Portal",
@@ -972,7 +972,7 @@ async function fetchOfficialMonitor(monitor){
           "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language":"en-IN,en;q=0.9"
         },
-      },2,6000);
+      },2,9000);
 
       if(!response.ok){
         failures.push(
