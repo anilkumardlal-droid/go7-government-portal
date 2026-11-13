@@ -82,6 +82,11 @@ function isConcreteEducationNotice(title, summary = "") {
   return action.test(t) && (detail.test(t + " " + s) || t.length >= 65);
 }
 
+function isConcreteFeedNotice(title, summary = "") {
+  return isConcreteGovtNotice(title, summary) ||
+    isConcreteEducationNotice(title, summary);
+}
+
 const json = (data,status=200,origin="*") => new Response(JSON.stringify(data),{
   status,
   headers:{
@@ -753,7 +758,8 @@ function extractOfficialLinks(html,pageUrl,monitor){
     const hrefMatch=anchor.match(/\bhref\s*=\s*(["'])(.*?)\1/i);
     if(!hrefMatch)continue;
     const title=clean(decode(anchor.replace(/<[^>]*>/g," ")),220);
-    if(!RECRUITMENT_RE.test(title)||!isConcreteGovtNotice(title)||IGNORE_RE.test(title))continue;
+    if((!RECRUITMENT_RE.test(title)&&!EDUCATION_NOTICE_RE.test(title))||
+       !isConcreteFeedNotice(title)||IGNORE_RE.test(title))continue;
 
     let target;
     try{target=new URL(decode(hrefMatch[2]),pageUrl);}catch{continue;}
@@ -1134,7 +1140,31 @@ async function syncOfficialMonitors(db,env,dateBudget){
 
 /* MAIN SYNC SYSTEM */
 
+// Only publisher-documented RSS endpoints are seeded here. State departments that do not
+// expose native RSS are covered by OFFICIAL_MONITORS and are still synced automatically.
+const DEFAULT_OFFICIAL_RSS_SOURCES = [
+  {
+    name:"Income Tax Department - Recruitment Notices RSS",
+    feed_url:"https://wm.incometaxindia.gov.in/recruitment-notices-rss-feed/-/asset_publisher/bxhj/rss",
+    category:"jobs-vacancies"
+  },
+  {
+    name:"Press Information Bureau - Official Press Releases RSS",
+    feed_url:"https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3",
+    category:"important-notices"
+  }
+];
+
+async function ensureDefaultOfficialRssSources(db){
+  for(const source of DEFAULT_OFFICIAL_RSS_SOURCES){
+    await db.prepare(
+      "INSERT OR IGNORE INTO sources(name,feed_url,category,active) VALUES(?,?,?,1)"
+    ).bind(source.name,source.feed_url,source.category).run();
+  }
+}
+
 async function syncAll(env){
+  await ensureDefaultOfficialRssSources(env.DB);
   const sources=await env.DB.prepare("SELECT * FROM sources WHERE active=1").all();
   let rssInserted=0;
   let rssSkipped=0;
@@ -1146,7 +1176,7 @@ async function syncAll(env){
     try{
       const entries=await fetchFeed(source,env);
       for(const item of entries){
-        if(!isConcreteGovtNotice(item.title,item.summary)||IGNORE_RE.test(item.title+" "+item.summary)){
+        if(!isConcreteFeedNotice(item.title,item.summary)||IGNORE_RE.test(item.title+" "+item.summary)){
           rssSkipped++;
           continue;
         }
