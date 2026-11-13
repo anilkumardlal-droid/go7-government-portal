@@ -1029,7 +1029,7 @@ failures.push(
 }
 
 
-async function syncOfficialMonitors(db,env,dateBudget){
+async function syncOfficialMonitors(db,env,dateBudget,publishedThisSyncByCategory){
   let inserted=0;
   let skipped=0;
   let dateChecks=0;
@@ -1121,6 +1121,7 @@ async function syncOfficialMonitors(db,env,dateBudget){
         ).run();
         if(write.meta?.changes){
           inserted++;
+          publishedThisSyncByCategory[category]=(publishedThisSyncByCategory[category]||0)+1;
           publishedNow=true;
         }else{
           skipped++;
@@ -1171,6 +1172,7 @@ async function syncAll(env){
   let rssSkipped=0;
   const errors=[];
   const dateBudget={used:0,max:2};
+  const publishedThisSyncByCategory=Object.fromEntries(CATEGORIES.map(([id])=>[id,0]));
 
   // RSS feeds: enrich missing dates from the official item page/PDF, within a small per-sync budget.
   await Promise.all((sources.results||[]).map(async source=>{
@@ -1197,6 +1199,8 @@ async function syncAll(env){
         const checkedAt=automatic?.checkedAt||((summaryDates.publishedAt||summaryDates.applicationLastDate)?new Date().toISOString():null);
         const summaryHasEvidence=!summaryDates.evidence.startsWith("No clearly labelled");
         const evidence=automatic?.evidence||(summaryHasEvidence?summaryDates.evidence:null);
+        const feedCategory=detectCategory(item.title,item.summary)||
+          (CATEGORY_SET.has(source.category)?source.category:"jobs-vacancies");
 
         if(duplicate){
           const incomingSummary=String(item.summary||"").trim();
@@ -1214,10 +1218,13 @@ async function syncAll(env){
           VALUES(?,?,?,?,?,?,?,?,?,?,'published','pending')
         `).bind(
           guid,item.title,item.summary,
-          (detectCategory(item.title,item.summary)||(CATEGORY_SET.has(source.category)?source.category:"jobs-vacancies")),
+          feedCategory,
           source.name,item.link,publishedAt,applicationLastDate,checkedAt,evidence
         ).run();
-        if(result.meta?.changes)rssInserted++;else rssSkipped++;
+        if(result.meta?.changes){
+          rssInserted++;
+          publishedThisSyncByCategory[feedCategory]=(publishedThisSyncByCategory[feedCategory]||0)+1;
+        }else rssSkipped++;
       }
       await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
       await env.DB.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'ok',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL) ON CONFLICT(source_name) DO UPDATE SET status='ok',last_checked_at=CURRENT_TIMESTAMP,last_success_at=CURRENT_TIMESTAMP,last_error=NULL").bind(source.name).run();
@@ -1230,19 +1237,33 @@ async function syncAll(env){
 
   let officialResult={checked:0,inserted:0,skipped:0,date_checks:0,errors:[]};
   try{
-    officialResult=await syncOfficialMonitors(env.DB,env,dateBudget);
+    officialResult=await syncOfficialMonitors(env.DB,env,dateBudget,publishedThisSyncByCategory);
     errors.push(...officialResult.errors);
   }catch(e){
     errors.push("Official monitoring: "+clean(e.message,180));
   }
 
   const pendingCount=await env.DB.prepare("SELECT COUNT(*) AS total FROM review_items WHERE status='pending'").first();
+  const categoryRows=await env.DB.prepare(
+    "SELECT category,COUNT(*) AS total FROM posts WHERE status='published' GROUP BY category"
+  ).all();
+  const publishedTotalByCategory=Object.fromEntries(CATEGORIES.map(([id])=>[id,0]));
+  for(const row of categoryRows.results||[]){
+    if(CATEGORY_SET.has(row.category))publishedTotalByCategory[row.category]=Number(row.total)||0;
+  }
+  const categorySummary=CATEGORIES.map(([id,label])=>({
+    category:id,
+    label,
+    published_this_sync:publishedThisSyncByCategory[id]||0,
+    published_total:publishedTotalByCategory[id]||0
+  }));
   return {
     sources_checked:(sources.results?.length||0)+officialResult.checked,
     review_pending:pendingCount?.total||0,
     rss:{inserted:rssInserted,skipped:rssSkipped},
     official:{checked:officialResult.checked,total:officialResult.total||OFFICIAL_MONITORS.length,inserted:officialResult.inserted,auto_published:officialResult.auto_published||0,skipped:officialResult.skipped,remaining:Math.max(0,(officialResult.total||OFFICIAL_MONITORS.length)-officialResult.checked)},
     date_extraction:{checked:dateBudget.used,limit:dateBudget.max,pending_next_sync:Math.max(0,officialResult.inserted+officialResult.skipped-dateBudget.used)},
+    category_summary:categorySummary,
     inserted:rssInserted+officialResult.inserted,
     skipped:rssSkipped+officialResult.skipped,
     errors
