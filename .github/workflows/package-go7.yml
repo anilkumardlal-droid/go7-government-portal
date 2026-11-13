@@ -1,9 +1,11 @@
-name: Package GO7 recovery build
+name: Package GO7 final build
 
 on:
   push:
     branches:
       - go7-recovery-work-20261113
+      - go7-final-deploy-20261113
+      - main
   workflow_dispatch:
 
 permissions:
