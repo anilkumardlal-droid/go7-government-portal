@@ -600,11 +600,11 @@ const OFFICIAL_MONITORS = [
     hosts:["jpsc.gov.in","www.jpsc.gov.in"]
   },
   {
-    name:"Jharkhand JSSC Notices",
-    category:"jobs-vacancies",
+    name:"Jharkhand JSSC Admit Cards",
+    category:"admit-cards-exams",
     parser:"table",
-    urls:["https://jssc.nic.in/"],
-    hosts:["jssc.nic.in","www.jssc.nic.in"]
+    urls:["https://jssc.jharkhand.gov.in/admit-card","https://jssc.jharkhand.gov.in/"],
+    hosts:["jssc.jharkhand.gov.in","www.jssc.jharkhand.gov.in"]
   },
   {
     name:"West Bengal PSC Notices",
