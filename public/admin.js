@@ -37,7 +37,8 @@ $("sync").onclick = async () => {
       `${d.skipped || 0} already existing. ` +
       `Government monitors checked: ${d.official?.checked || 0}/${d.official?.total || 0} in this run; ${d.official?.remaining || 0} will rotate through later syncs. ` +
       `Dates auto-read from ${d.date_extraction?.checked || 0} official pages/PDFs in this run (maximum ${d.date_extraction?.limit || 2}); remaining items continue on later syncs. ` +
-      `Pending official notices for review: ${d.review_pending || 0}. ` +
+      `Auto-published official notices: ${d.official?.auto_published || 0}. ` +
+      `Older notices awaiting official re-check: ${d.review_pending || 0}. ` +
       `Errors: ${(d.errors || []).join(" | ") || "None"}`
     );
   } catch (e) {
@@ -59,49 +60,20 @@ async function loadReview(){
   try{
     const d=await call("/api/admin/review");
     const items=d.items||[];
-    if(!items.length){$("review").textContent="No notices are waiting for review.";return;}
-    $("review").innerHTML=items.map(item=>{
-      const pub=dateInputValue(item.published_at);
-      const deadline=dateInputValue(item.application_last_date);
-      const expired=Boolean(deadline&&deadline<indiaToday());
-      const autoStatus=item.date_checked_at
-        ?(pub||deadline?"Automatic date reading found at least one labelled date. Verify the source evidence below.":"Automatic reading finished but could not confirm a labelled date. Admin verification is required.")
-        :"Automatic page/PDF reading is waiting for a sync run.";
-      const evidence=item.date_evidence?escapeHtml(item.date_evidence):"No date evidence recorded yet.";
-      return `<div class="source-row" data-review-card="${item.id}">
-        <b>${escapeHtml(item.title)}</b> · ${escapeHtml(item.category)}
-        <br><small>${escapeHtml(item.source_name)} · Detected by GO7: ${escapeHtml(item.detected_at||"unknown")} (this is not the notice publication date)</small>
-        <br><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener">Open official notice</a>
-        <p><strong>Date extraction:</strong> ${escapeHtml(autoStatus)}</p>
-        <small><strong>What GO7 read:</strong> ${evidence}</small>
-        ${expired?'<p><strong>APPLICATION CLOSED — archive notice</strong></p>':""}
-        <div class="field"><label>Official publication date (automatically filled when confirmed; otherwise check the notice)</label><input type="date" data-published value="${pub}"></div>
-        <div class="field"><label>Application last date (if applicable; automatically filled when confirmed)</label><input type="date" data-deadline value="${deadline}"></div>
-        <small>${expired?"The deadline has passed. Approving will publish it as a closed/archived notice.":deadline?"Application deadline is recorded; compare it with the official source.": "If a date could not be confirmed, enter it only after checking the official webpage/PDF. Leave it blank if that date does not apply."}</small>
-        <br><button type="button" data-approve="${item.id}" class="primary">Approve & publish</button> <button type="button" data-dismiss="${item.id}" class="secondary">Dismiss</button>
-      </div>`;
-    }).join("");
+    if(!items.length){
+      $("review").textContent="No older pending notices. New verified official notices are published automatically.";
+      return;
+    }
+    $("review").innerHTML=items.map(item=>`<div class="source-row">
+      <b>${escapeHtml(item.title)}</b> · ${escapeHtml(item.category)}
+      <br><small>${escapeHtml(item.source_name)} · Detected: ${escapeHtml(item.detected_at||"unknown")}</small>
+      <br><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener">Open official source</a>
+      <p><strong>Legacy pending notice:</strong> Not republished yet. GO7 will publish it automatically only if it is found again on this monitor's official notice page.</p>
+    </div>`).join("");
   }catch(e){say(e.message);}
 }
 
 $("loadReview").onclick=loadReview;
-$("review").addEventListener("click",async event=>{
-  const approve=event.target.closest("[data-approve]");
-  const dismiss=event.target.closest("[data-dismiss]");
-  const button=approve||dismiss;
-  if(!button)return;
-  const id=button.getAttribute(approve?"data-approve":"data-dismiss");
-  try{
-    const card=button.closest("[data-review-card]");
-    const body=approve?{
-      published_at:card?.querySelector("[data-published]")?.value||"",
-      application_last_date:card?.querySelector("[data-deadline]")?.value||""
-    }:{};
-    const d=await call(`/api/admin/review/${id}/${approve?"approve":"dismiss"}`,"POST",body);
-    say(d.message||"Review updated.");
-    await loadReview();
-  }catch(e){say(e.message);}
-});
 
 $("publishPost").onclick=async()=>{try{say("Publishing verified update…");const d=await call("/api/admin/posts","POST",{title:$("postTitle").value.trim(),summary:$("postSummary").value.trim(),category:$("postCategory").value,source_name:$("postSource").value.trim(),source_url:$("postUrl").value.trim(),published_at:$("postPublished").value,application_last_date:$("postDeadline").value});say(d.message||"Published.");$("postTitle").value="";$("postSummary").value="";$("postUrl").value="";$("postPublished").value="";$("postDeadline").value="";}catch(e){say(e.message);}};
 
