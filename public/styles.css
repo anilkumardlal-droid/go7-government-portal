@@ -342,3 +342,73 @@ button.is-loading::before{content:"";width:14px;height:14px;border:2px solid cur
 .footer-brand{flex-direction:row;align-items:center;gap:8px;white-space:nowrap}
 .footer-brand strong{display:inline-block;padding:10px;font-size:30px;font-weight:500}
 .footer-brand span{display:inline-block;font-size:13px;font-weight:500}
+
+
+/* Final typography rule: no ordinary readable website text below 14px */
+body{font-size:14px}
+.header-note{font-size:16px;font-weight:600}
+.header-search{font-size:14px}
+.main-nav>a{font-size:15px;font-weight:600}
+.nav-more summary{font-size:15px;font-weight:600}
+.nav-more-menu a{font-size:14px}
+.menu-toggle{font-size:14px}
+.update-strip,.update-strip strong,.update-strip span{font-size:14px}
+.eyebrow{font-size:14px;letter-spacing:.3px}
+.hero-copy,.hero-trust,.section-heading>p{font-size:14px}
+.quick-title,.quick-subtitle{font-size:14px}
+.view-all{font-size:14px}
+.post-link,.feed-link,.post-card-link,.post-grid .post a,.category-post-card a{font-size:14px}
+.loading-note,.empty-panel,.status{font-size:14px}
+.post-card h3,.category-post-card h2,.post-card p,.category-post-card p{font-size:14px}
+.post-meta,.pill{font-size:14px}
+.editorial-content p,.faq-section p,.faq-section summary{font-size:14px}
+.disclaimer,.disclaimer strong,.disclaimer span,.disclaimer a{font-size:14px}
+.category-intro p,.category-intro h2{font-size:14px}
+.breadcrumb,.breadcrumb a{font-size:14px}
+.detail-title{font-size:20px;font-weight:600}
+.detail-meta{font-size:14px}
+.detail-section h2{font-size:18px}
+.detail-section p,.detail-table,.detail-table th,.detail-table td{font-size:14px}
+.detail-links a{font-size:14px}
+.footer-brand strong{font-size:30px;font-weight:500;padding:10px}
+.footer-brand span,.footer-links a,.footer-copyright,.footer-inner>small{font-size:14px;font-weight:500}
+.footer-brand{flex-direction:row;align-items:center;gap:8px;white-space:nowrap}
+.footer-links{gap:14px}
+.footer-copyright{text-align:right;white-space:normal}
+.search-form input,.search-page-form input{font-size:15px}
+.search-form button,.search-page-form button,.not-found-search button{font-size:14px}
+.search-page-copy,.search-result-card p{font-size:14px}
+.search-page-hero h1{font-size:30px}
+.search-page-results h2{font-size:20px}
+.search-result-card h2{font-size:16px}
+.secondary-button,.pagination button{font-size:14px}
+.admin-wrap p,.message,.field label,.field input,.field select,.field textarea,.admin-actions button,.source-row,.source-row small{font-size:14px}
+@media(max-width:900px){
+ .main-nav>a{font-size:15px;font-weight:600}
+ .nav-more summary{font-size:15px;font-weight:600}
+}
+@media(max-width:760px){
+ .main-nav>a{font-size:15px;font-weight:600}
+ .nav-more summary{font-size:15px;font-weight:600}
+ .nav-more-menu a{font-size:14px}
+ .header-search{font-size:14px}
+ .update-strip,.update-strip strong,.update-strip span{font-size:14px}
+ .quick-title,.quick-subtitle,.view-all{font-size:14px}
+ .post-link,.feed-link,.post-card-link,.post-grid .post a,.category-post-card a{font-size:14px}
+ .post-meta,.pill,.status,.loading-note,.empty-panel{font-size:14px}
+ .footer-inner{display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:0}
+ .footer-links{width:100%;gap:10px 14px}
+ .footer-inner>small,.footer-copyright{width:100%;font-size:14px;text-align:left}
+ .footer-brand{white-space:nowrap}
+ .footer-brand strong{font-size:30px}
+ .footer-brand span{font-size:14px}
+ .search-form input,.search-page-form input{font-size:15px}
+ .search-form button,.search-page-form button{font-size:14px}
+ .detail-title{font-size:20px}
+ .detail-meta{font-size:14px}
+ .breadcrumb,.breadcrumb a{font-size:14px}
+ .category-intro p,.detail-section p,.post-card p,.category-post-card p,.content-card p,.not-found-card p,.editorial-content p,.faq-section p{font-size:14px}
+}
+@media(max-width:390px){
+ .header-search{font-size:14px}
+}
