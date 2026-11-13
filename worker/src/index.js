@@ -1158,7 +1158,8 @@ const DEFAULT_OFFICIAL_RSS_SOURCES = [
 async function ensureDefaultOfficialRssSources(db){
   for(const source of DEFAULT_OFFICIAL_RSS_SOURCES){
     await db.prepare(
-      "INSERT OR IGNORE INTO sources(name,feed_url,category,active) VALUES(?,?,?,1)"
+      "INSERT INTO sources(name,feed_url,category,active) VALUES(?,?,?,1) " +
+      "ON CONFLICT(feed_url) DO UPDATE SET name=excluded.name,category=excluded.category,active=1"
     ).bind(source.name,source.feed_url,source.category).run();
   }
 }
