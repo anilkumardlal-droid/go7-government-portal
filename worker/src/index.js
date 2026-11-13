@@ -68,17 +68,17 @@ function isConcreteGovtNotice(title, summary = "") {
 // Student-focused notices from official education boards and admission portals.
 // Do not treat generic menus, event news, or admin-only circulars as student notices.
 const EDUCATION_NOTICE_RE =
-  /\\b(?:admissions?|entrance(?:\\s+(?:exam|examination|test))?|counsell?ing|seat allotment|scholarships?|academic session|registration|enrolment|enrollment|exam(?:ination)? form|board examination|board exam|date sheet|time ?table|syllabus|model question|merit list|application form|information bulletin|semester examination|secondary examination|intermediate examination|UGC[- ]?NET|CUET|NEET|JEE|B\\.?Ed|class\\s*(?:[6-9]|10|11|12|ix|x|xi|xii))\\b/i;
+  /\b(?:admissions?|entrance(?:\s+(?:exam|examination|test))?|counsell?ing|seat allotment|scholarships?|academic session|registration|enrolment|enrollment|exam(?:ination)? form|board examination|board exam|date sheet|time ?table|syllabus|model question|merit list|application form|information bulletin|semester examination|secondary examination|intermediate examination|UGC[- ]?NET|CUET|NEET|JEE|B\.?Ed|class\s*(?:[6-9]|10|11|12|ix|x|xi|xii))\b/i;
 
 function isConcreteEducationNotice(title, summary = "") {
-  const t = clean(title, 500).replace(/\\s+/g, " ").trim();
-  const s = clean(summary, 1600).replace(/\\s+/g, " ").trim();
+  const t = clean(title, 500).replace(/\s+/g, " ").trim();
+  const s = clean(summary, 1600).replace(/\s+/g, " ").trim();
   if (!isUsefulNoticeTitle(t) || GENERIC_NAV_TITLE_RE.test(t)) return false;
-  if (/\\b(?:sports fixture|tender|procurement|quotation|photo gallery|celebration|teacher transfer|promotion order|seniority list|office routine|holiday list)\\b/i.test(t)) return false;
+  if (/\b(?:sports fixture|tender|procurement|quotation|photo gallery|celebration|teacher transfer|promotion order|seniority list|office routine|holiday list)\b/i.test(t)) return false;
   const combined = t + " " + s;
   if (!EDUCATION_NOTICE_RE.test(combined)) return false;
-  const action = /\\b(?:notice|notification|inviting|online application|apply|registration|form|schedule|date|extended|extension|allotment|counselling|counseling|result|merit list|admission|entrance|exam|examination|scholarship|syllabus|bulletin|academic session)\\b/i;
-  const detail = /\\b(?:20\\d{2}|class|semester|UG|PG|degree|diploma|school|college|university|board|entrance|admission|exam|examination|last date|online|application|session|CUET|NEET|JEE|B\\.?Ed|UGC)\\b/i;
+  const action = /\b(?:notice|notification|inviting|online application|apply|registration|form|schedule|date|extended|extension|allotment|counselling|counseling|result|merit list|admission|entrance|exam|examination|scholarship|syllabus|bulletin|academic session)\b/i;
+  const detail = /\b(?:20\d{2}|class|semester|UG|PG|degree|diploma|school|college|university|board|entrance|admission|exam|examination|last date|online|application|session|CUET|NEET|JEE|B\.?Ed|UGC)\b/i;
   return action.test(t) && (detail.test(t + " " + s) || t.length >= 65);
 }
 
@@ -882,18 +882,18 @@ function extractOfficialTableRows(html,pageUrl,monitor){
 function extractOfficialEducationEntries(html,pageUrl,monitor){
   const out=[];
   const seen=new Set();
-  const rows=String(html||"").match(/<tr\\b[^>]*>[\\s\\S]*?<\\/tr>/gi)||[];
-  const dateOnly=/^(?:\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{4}|\\d{4}-\\d{2}-\\d{2})$/;
+  const rows=String(html||"").match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[];
+  const dateOnly=/^(?:\d{1,2}[\/-]\d{1,2}[\/-]\d{4}|\d{4}-\d{2}-\d{2})$/;
 
   const candidateLinks=(row)=>{
-    return [...row.matchAll(/<a\\b([^>]*)>([\\s\\S]*?)<\\/a>/gi)].map(match=>{
+    return [...row.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].map(match=>{
       const label=cleanFeedContent(match[2],180);
-      const href=match[1].match(/\\bhref\\s*=\\s*(["'])(.*?)\\1/i)?.[2];
+      const href=match[1].match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
       if(!href||/^(?:apply|apply online|click here|read more|view|download|more|login|register)$/i.test(label))return null;
       try{
         const target=new URL(decode(href),pageUrl);
         if(!["http:","https:"].includes(target.protocol)||!monitor.hosts.includes(target.hostname.toLowerCase()))return null;
-        return {url:target.href,label,priority:/\\.pdf(?:$|[?#])/i.test(target.href)?0:1};
+        return {url:target.href,label,priority:/\.pdf(?:$|[?#])/i.test(target.href)?0:1};
       }catch{return null;}
     }).filter(Boolean).sort((a,b)=>a.priority-b.priority);
   };
@@ -915,11 +915,11 @@ function extractOfficialEducationEntries(html,pageUrl,monitor){
   };
 
   for(const row of rows){
-    const cells=[...row.matchAll(/<(td|th)\\b[^>]*>([\\s\\S]*?)<\\/\\1>/gi)]
+    const cells=[...row.matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
       .map(match=>cleanFeedContent(match[2],900)).filter(Boolean);
     if(cells.length<2)continue;
     const rowText=clean(cells.join(" | "),1500);
-    const titleCells=cells.filter(cell=>!dateOnly.test(cell.trim())&&!/^\\d{1,4}$/.test(cell.trim())&&
+    const titleCells=cells.filter(cell=>!dateOnly.test(cell.trim())&&!/^\d{1,4}$/.test(cell.trim())&&
       !/^(?:apply|apply online|click here|read more|view|download|more|login|register)$/i.test(cell.trim()));
     const linkedTitle=candidateLinks(row).map(x=>x.label).find(label=>
       isConcreteEducationNotice(label,rowText)||isConcreteGovtNotice(label,rowText)
@@ -928,18 +928,18 @@ function extractOfficialEducationEntries(html,pageUrl,monitor){
       isConcreteEducationNotice(cell,rowText)||isConcreteGovtNotice(cell,rowText)
     )||titleCells.slice(0,2).join(" - ");
     const link=candidateLinks(row)[0]?.url||"";
-    const dateText=rowText.match(/\\b(?:\\d{1,2}[-\\/.][A-Za-z]{3}[-\\/.]20\\d{2}|\\d{1,2}[-\\/.]\\d{1,2}[-\\/.]20\\d{2}|20\\d{2}-\\d{2}-\\d{2})\\b/i)?.[0]||"";
+    const dateText=rowText.match(/\b(?:\d{1,2}[-\/.][A-Za-z]{3}[-\/.]20\d{2}|\d{1,2}[-\/.]\d{1,2}[-\/.]20\d{2}|20\d{2}-\d{2}-\d{2})\b/i)?.[0]||"";
     add(title,rowText,link,dateText);
     if(out.length>=20)break;
   }
 
   // Card/list-style portals (e.g. notice boards without an HTML table).
   if(out.length<20){
-    const anchors=[...String(html||"").matchAll(/<a\\b([^>]*)>([\\s\\S]*?)<\\/a>/gi)];
+    const anchors=[...String(html||"").matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)];
     for(const match of anchors){
       const label=cleanFeedContent(match[2],220);
       if(!label)continue;
-      const href=match[1].match(/\\bhref\\s*=\\s*(["'])(.*?)\\1/i)?.[2];
+      const href=match[1].match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
       if(!href)continue;
       try{
         const target=new URL(decode(href),pageUrl);
