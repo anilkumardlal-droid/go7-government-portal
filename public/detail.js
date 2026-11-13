@@ -43,7 +43,7 @@
   $("detailCategory").textContent=p.category_label||p.category||"GO7 Update";
   $("detailTitle").textContent=p.title||"Government Update";
   $("detailMeta").innerHTML='<span><strong>Department / Source:</strong> '+esc(p.source_name||p.ai_details?.department||"Original publisher")+'</span><span><strong>Published:</strong> '+esc(date(p.published_at||p.created_at))+'</span>';
-  $("detailSummary").textContent=p.summary||p.ai_details?.overview||"The publisher has not supplied a full text description. Open the original notification for complete information.";
+  $("detailSummary").textContent=p.ai_details?.overview||p.summary||"The publisher has not supplied a full text description. Open the original notification for complete information.";
   $("extractedDetails").innerHTML=renderDetails(p.ai_details);
   $("extractedSection").hidden=!$("extractedDetails").innerHTML;
   $("detailTable").innerHTML=[["Update Category",p.category_label||p.category],["Publishing Source",p.source_name||"Original publisher"],["Publication Date",date(p.published_at||p.created_at)]].map(([k,v])=>'<tr><th>'+esc(k)+'</th><td>'+esc(v)+'</td></tr>').join("");
