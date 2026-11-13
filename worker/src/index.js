@@ -464,8 +464,8 @@ async function fetchFeed(source,env){
 }
 
 
-// Official government recruitment pages. Native RSS is used only where the department publishes one;
-// the remaining pages are monitored directly and their notices enter the Admin Review Queue.
+// Official government recruitment and exam pages. Native RSS is used where departments publish it;
+// other official notice pages are scanned automatically and qualifying notices are published directly.
 const OFFICIAL_MONITORS = [
   {
     name:"Employment News - Jobs",
