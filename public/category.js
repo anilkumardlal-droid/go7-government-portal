@@ -1,6 +1,6 @@
 (() => {
  const API=(window.GO7_CONFIG?.API_BASE||"").replace(/\/$/,"");
- const category=window.GO7_CATEGORY||new URLSearchParams(location.search).get("category")||"latest-jobs";
+ const category=window.GO7_CATEGORY||new URLSearchParams(location.search).get("category")||"jobs-vacancies";
  const $=id=>document.getElementById(id);const limit=24;let offset=0,loading=false;
  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const date=s=>{if(!s)return"Recently added";const d=new Date(s);return Number.isNaN(d.getTime())?"Recently added":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});};
