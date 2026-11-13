@@ -1,3 +1,19 @@
+# Legacy category URLs permanently point to the consolidated category pages.
+/latest-jobs/ /jobs-vacancies/ 301
+/latest-jobs /jobs-vacancies/ 301
+/iti-jobs/ /jobs-vacancies/ 301
+/iti-jobs /jobs-vacancies/ 301
+/outsourcing-jobs/ /jobs-vacancies/ 301
+/outsourcing-jobs /jobs-vacancies/ 301
+/admit-cards/ /admit-cards-exams/ 301
+/admit-cards /admit-cards-exams/ 301
+/documents/ /important-notices/ 301
+/documents /important-notices/ 301
+/admissions/ /admissions-education/ 301
+/admissions /admissions-education/ 301
+/syllabus/ /admissions-education/ 301
+/syllabus /admissions-education/ 301
+
 # Unique individual post URLs only; category folders serve their own index.html by default.
 /detail/:slug/ /detail.html 200
 /detail/:slug /detail.html 200
