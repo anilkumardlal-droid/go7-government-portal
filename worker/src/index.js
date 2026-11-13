@@ -597,6 +597,8 @@ const OFFICIAL_MONITORS = [
   }
 ];
 
+const OFFICIAL_MONITOR_BATCH_SIZE = 6;
+
 const RECRUITMENT_RE =
   /\b(advt?\.?\s*no\.?|advertisement\s+no\.?|recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam(?:ination)? date|exam(?:ination)? schedule|skill test|cbt|corrigendum|postpon(?:ed|ement)|personality test|written test|preliminary examination|main examination|provisional result|final result)\b/i;
 
@@ -819,10 +821,33 @@ async function syncOfficialMonitors(db,env,dateBudget){
   let skipped=0;
   let dateChecks=0;
   const errors=[];
-  const results=await Promise.all(OFFICIAL_MONITORS.map(m=>fetchOfficialMonitor(m)));
 
-  for(let i=0;i<OFFICIAL_MONITORS.length;i++){
-    const monitor=OFFICIAL_MONITORS[i];
+  // Rotate through a small batch so one Worker invocation stays below the
+  // subrequest ceiling. The cursor persists in D1 across manual and cron syncs.
+  const cursorRow=await db.prepare(
+    "SELECT state_value FROM sync_state WHERE state_key='official_monitor_cursor'"
+  ).first();
+  let cursor=Number.parseInt(cursorRow?.state_value||"0",10);
+  if(!Number.isInteger(cursor)||cursor<0)cursor=0;
+  cursor=cursor%OFFICIAL_MONITORS.length;
+
+  const monitors=Array.from(
+    {length:Math.min(OFFICIAL_MONITOR_BATCH_SIZE,OFFICIAL_MONITORS.length)},
+    (_,offset)=>OFFICIAL_MONITORS[(cursor+offset)%OFFICIAL_MONITORS.length]
+  );
+  const nextCursor=(cursor+monitors.length)%OFFICIAL_MONITORS.length;
+
+  // Advance before fetching: a single slow/unavailable source must not pin the
+  // rotation on the same batch during every scheduled run.
+  await db.prepare(
+    "INSERT INTO sync_state(state_key,state_value) VALUES('official_monitor_cursor',?) " +
+    "ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value,updated_at=CURRENT_TIMESTAMP"
+  ).bind(String(nextCursor)).run();
+
+  const results=await Promise.all(monitors.map(m=>fetchOfficialMonitor(m)));
+
+  for(let i=0;i<monitors.length;i++){
+    const monitor=monitors[i];
     const result=results[i];
     if(result.error){
       errors.push(`${monitor.name}: ${result.error}`);
@@ -883,7 +908,7 @@ async function syncOfficialMonitors(db,env,dateBudget){
       else skipped++;
     }
   }
-  return {checked:OFFICIAL_MONITORS.length,inserted,skipped,date_checks:dateChecks,errors};
+  return {checked:monitors.length,total:OFFICIAL_MONITORS.length,inserted,skipped,date_checks:dateChecks,errors};
 }
 
 /* MAIN SYNC SYSTEM */
@@ -893,7 +918,7 @@ async function syncAll(env){
   let rssInserted=0;
   let rssSkipped=0;
   const errors=[];
-  const dateBudget={used:0,max:8};
+  const dateBudget={used:0,max:2};
 
   // RSS feeds: enrich missing dates from the official item page/PDF, within a small per-sync budget.
   await Promise.all((sources.results||[]).map(async source=>{
@@ -960,7 +985,7 @@ async function syncAll(env){
     sources_checked:(sources.results?.length||0)+officialResult.checked,
     review_pending:pendingCount?.total||0,
     rss:{inserted:rssInserted,skipped:rssSkipped},
-    official:{checked:officialResult.checked,inserted:officialResult.inserted,skipped:officialResult.skipped},
+    official:{checked:officialResult.checked,total:officialResult.total||OFFICIAL_MONITORS.length,inserted:officialResult.inserted,skipped:officialResult.skipped,remaining:Math.max(0,(officialResult.total||OFFICIAL_MONITORS.length)-officialResult.checked)},
     date_extraction:{checked:dateBudget.used,limit:dateBudget.max,pending_next_sync:Math.max(0,officialResult.inserted+officialResult.skipped-dateBudget.used)},
     inserted:rssInserted+officialResult.inserted,
     skipped:rssSkipped+officialResult.skipped,
