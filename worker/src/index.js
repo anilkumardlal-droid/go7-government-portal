@@ -31,11 +31,35 @@ function isOfficialHost(hostname) {
   return host.endsWith(".gov.in") || host.endsWith(".nic.in") || host.endsWith(".ac.in") || host.endsWith(".edu.in");
 }
 
+const GENERIC_NAV_TITLE_RE =
+  /^(?:sub[-\s]?inspector\s+notices?|recruitment\s+notices?|recruitment\s+rules?|direct\s+recruitment|answer\s*keys?|results?|notices?|notifications?|user\s+instructions?|view\s+advertisement|apply(?:\s+online)?|web\s+advertisement|new\s+advertisement\s+policy|advertisement\s+policy|careers?|career|home|about(?:\s+us)?|contact(?:\s+us)?|download(?:\s+pdf)?|read\s+more|click\s+here)$/i;
+
 function isUsefulNoticeTitle(title) {
   const value = clean(title, 220).toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
-  if (value.length < 16) return false;
-  return !/^(download )?(admit card|hall ticket|notice|notification|recruitment|advertisement|click here|read more|latest update|important notice|web advertisement|new advertisement policy|advertisement policy)$/.test(value)
-    && !/^(web advertisement|new advertisement policy|advertisement policy)\b/.test(value);
+  if (value.length < 16 || GENERIC_NAV_TITLE_RE.test(value)) return false;
+  if (/\b(?:user instructions?|web advertisement|advertisement policy|recruitment rules?|privacy policy|terms and conditions)\b/i.test(value)) return false;
+  return !/^(?:download )?(?:admit card|hall ticket|notice|notification|recruitment|advertisement|click here|read more|latest update|important notice)$/i.test(value);
+}
+
+// Auto-publishing requires a concrete notice title, not a menu label or a page
+// whose only recruitment-related words appear in navigation buttons.
+function isConcreteGovtNotice(title, summary = "") {
+  const t = clean(title, 500).replace(/\s+/g, " ").trim();
+  const s = clean(summary, 1600).replace(/\s+/g, " ").trim();
+  if (!isUsefulNoticeTitle(t)) return false;
+  if (GENERIC_NAV_TITLE_RE.test(t)) return false;
+  if (/\b(?:user instructions?|view advertisement|new advertisement policy|web advertisement|recruitment rules?)\b/i.test(t)) return false;
+
+  const concrete = /\b(?:advt?\.?\s*(?:no\.?|number)?|advertisement\s+(?:no\.?|number|for)|notification\s+(?:no\.?|number|for|regarding)|recruitment\s+(?:notification|of|to|for)|applications?\s+(?:are\s+)?invited|inviting\s+(?:online\s+)?applications?|apply\s+online|vacanc(?:y|ies)|posts?\s+of|post\s+of|CEN[-\s/]?\d|selection\s+list|merit\s+list|short[-\s]?listed|result\s+of|admit\s+card\s+for|hall\s+ticket\s+for|answer\s+keys?\s+(?:for|of)|response\s+sheet\s+for|exam(?:ination)?\s+(?:date|schedule|notification|notice)|call\s+letter\s+for|corrigendum\s+to|extension\s+of\s+(?:the\s+)?(?:last\s+date|application|date)|postpon(?:ed|ement)|reschedul(?:ed|ing)|provisional\s+result|final\s+result)\b/i;
+  if (concrete.test(t)) return true;
+
+  // Some State PSC portals list a named examination plus an advertisement number.
+  const advertId = /\b(?:[A-Z]{0,3}[-/]?\d{1,4}\/[A-Z0-9-]+\/20\d{2}|CEN[-\s]?\d{1,4}\/20\d{2})\b/i;
+  if (advertId.test(t) && /\b(?:exam(?:ination)?|test|recruitment)\b/i.test(t)) return true;
+
+  const titleSignals = /\b(?:recruitment|vacanc(?:y|ies)|hiring|selection|shortlist|result|admit\s+card|hall\s+ticket|answer\s+key|examination|exam)\b/i;
+  const detailSignals = /\b(?:advertisement|notification|application|last\s+date|apply|post|vacanc|CEN|advt|exam\s+date|result|selection)\b/i;
+  return titleSignals.test(t) && detailSignals.test(s);
 }
 
 const json = (data,status=200,origin="*") => new Response(JSON.stringify(data),{
@@ -406,8 +430,11 @@ async function fetchFeed(source,env){
 
   const parsed = parseFeed(text,source);
   return parsed.filter(item => {
-    try { return isOfficialHost(new URL(item.link).hostname) && isUsefulNoticeTitle(item.title); }
-    catch { return false; }
+    try {
+      return isOfficialHost(new URL(item.link).hostname) &&
+        isConcreteGovtNotice(item.title,item.summary) &&
+        !IGNORE_RE.test(item.title+" "+item.summary);
+    } catch { return false; }
   }).slice(0, Math.max(1, Math.min(50, Number(env.MAX_ITEMS_PER_FEED) || 25)));
 }
 
@@ -609,40 +636,26 @@ const IGNORE_RE =
 function extractOfficialLinks(html,pageUrl,monitor){
   const out=[];
   const seen=new Set();
+  const anchors=String(html||"").match(/<a\b[^>]*>[\s\S]*?<\/a>/gi)||[];
 
-  const anchors=html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi)||[];
-
-  for(const a of anchors){
-    const hm=a.match(/\bhref\s*=\s*(["'])(.*?)\1/i);
-    if(!hm)continue;
-
-    const title=clean(decode(a.replace(/<[^>]*>/g," ")),220);
-
-    if(title.length<8||
-       !RECRUITMENT_RE.test(title)||
-       IGNORE_RE.test(title))continue;
+  for(const anchor of anchors){
+    const hrefMatch=anchor.match(/\bhref\s*=\s*(["'])(.*?)\1/i);
+    if(!hrefMatch)continue;
+    const title=clean(decode(anchor.replace(/<[^>]*>/g," ")),220);
+    if(!RECRUITMENT_RE.test(title)||!isConcreteGovtNotice(title)||IGNORE_RE.test(title))continue;
 
     let target;
-
-    try{
-      target=new URL(decode(hm[2]),pageUrl);
-    }catch{
-      continue;
-    }
-
-    if(!/^https?:$/.test(target.protocol)||
-       !monitor.hosts.includes(target.hostname.toLowerCase()))continue;
-
-    if(target.pathname==="/"||
-       target.href===pageUrl||
+    try{target=new URL(decode(hrefMatch[2]),pageUrl);}catch{continue;}
+    if(!["http:","https:"].includes(target.protocol)||
+       !monitor.hosts.includes(target.hostname.toLowerCase())||
+       target.pathname==="/"||target.href===pageUrl||
        seen.has(target.href))continue;
 
+    if(/(?:userhelp|user-instruction|recruitment-rules|advertisement-policy)/i.test(target.pathname))continue;
     seen.add(target.href);
     out.push({title,link:target.href,publishedAt:null,applicationLastDate:null});
-
     if(out.length>=12)break;
   }
-
   return out;
 }
 
@@ -656,45 +669,43 @@ function extractEmploymentNewsRows(html,pageUrl,monitor){
       .map(match=>cleanFeedContent(match[2],800));
     if(cells.length<3)continue;
 
-    const rowText=cells.join(" ");
     if(/issued date|organisation|last date/i.test(cells.slice(0,3).join(" ")))continue;
-
     const organisation=cells[1]||"";
     const post=cells[2]||"";
     const method=cells[3]||"";
     const lastDate=cells[cells.length-1]||"";
-    if(!organisation||!post||!RECRUITMENT_RE.test(rowText))continue;
-
-    const publishedAt=parseOfficialDate(cells[0]);
-    const applicationLastDate=parseOfficialDate(lastDate);
+    if(!organisation||!post)continue;
 
     const title=clean(organisation+" - "+post,220);
-    if(!isUsefulNoticeTitle(title))continue;
+    const summary=clean("Issued date: "+(cells[0]||"Not shown")+
+      "; appointment: "+(method||"Not shown")+
+      "; last date: "+(lastDate||"Not shown")+". Official Employment News listing.",1200);
+    if(!isConcreteGovtNotice(title,summary))continue;
 
-    let link=pageUrl;
-    const hrefs=[...row.matchAll(/<a\b[^>]*href\s*=\s*(["'])(.*?)\1/gi)];
-    for(const match of hrefs){
+    let link="";
+    const anchors=[...row.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)];
+    for(const match of anchors){
+      const label=cleanFeedContent(match[2],160);
+      if(/\b(?:apply|user instructions?|click here|read more)\b/i.test(label))continue;
+      const href=match[1].match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
+      if(!href)continue;
       try{
-        const target=new URL(decode(match[2]),pageUrl);
+        const target=new URL(decode(href),pageUrl);
         if(["http:","https:"].includes(target.protocol)&&monitor.hosts.includes(target.hostname.toLowerCase())){
           link=target.href;
           break;
         }
       }catch{}
     }
+    if(!link)continue;
 
     const key=link+"|"+title;
     if(seen.has(key))continue;
     seen.add(key);
     out.push({
-      title,
-      link,
-      guid:key,
-      summary:clean("Issued date: "+(cells[0]||"Not shown")+
-        "; appointment: "+(method||"Not shown")+
-        "; last date: "+(lastDate||"Not shown")+". Official Employment News listing.",1200),
-      publishedAt,
-      applicationLastDate
+      title,link,guid:key,summary,
+      publishedAt:parseOfficialDate(cells[0]),
+      applicationLastDate:parseOfficialDate(lastDate)
     });
   }
   return out.slice(0,25);
@@ -706,41 +717,45 @@ function extractOfficialTableRows(html,pageUrl,monitor){
   const out=[];
   const seen=new Set();
   const rows=String(html||"").match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[];
+  const actionCell=/^(?:user instructions?|view advertisement|detailed advertisement|advertisement|notification|apply(?: online)?|download(?: pdf)?|view details?|view|read more|click here|more|select)$/i;
+  const dateCell=/^(?:\d{1,2}[\/-]\d{1,2}[\/-]\d{4}|\d{4}-\d{2}-\d{2})$/;
 
   for(const row of rows){
-    const cells=[...row.matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
+    const rawCells=[...row.matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
       .map(match=>cleanFeedContent(match[2],1200))
       .filter(Boolean);
-    if(cells.length<2)continue;
-
-    const rowText=cells.join(" ");
+    if(rawCells.length<2)continue;
+    const rowText=rawCells.join(" ");
     if(IGNORE_RE.test(rowText))continue;
-    const title=clean(cells.slice(1).join(" - "),220);
-    if(!isUsefulNoticeTitle(title)||!RECRUITMENT_RE.test(title))continue;
 
-    const hrefs=[...row.matchAll(/<a\b[^>]*href\s*=\s*(["'])(.*?)\1/gi)];
-    let link="";
-    for(const match of hrefs){
+    const titleCells=rawCells.filter((cell,index)=>
+      !actionCell.test(cell.trim())&&!dateCell.test(cell.trim())&&
+      !(index===0&&/^\d{1,5}$/.test(cell.trim()))
+    );
+    const title=clean(titleCells.slice(0,3).join(" - "),220);
+    if(!RECRUITMENT_RE.test(rowText)||!isConcreteGovtNotice(title,rowText))continue;
+
+    const linkCandidates=[...row.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].map(match=>{
+      const label=cleanFeedContent(match[2],160);
+      const href=match[1].match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
+      if(!href||/\b(?:user instructions?|apply(?: online)?|login|register|click here|read more)\b/i.test(label))return null;
       try{
-        const target=new URL(decode(match[2]),pageUrl);
-        if(["http:","https:"].includes(target.protocol)&&monitor.hosts.includes(target.hostname.toLowerCase())){
-          link=target.href;
-          break;
-        }
-      }catch{}
-    }
-    // Only ingest a row when it points to a document/page on the same official institution.
-    if(!link)continue;
+        const target=new URL(decode(href),pageUrl);
+        if(!["http:","https:"].includes(target.protocol)||!monitor.hosts.includes(target.hostname.toLowerCase()))return null;
+        const priority=/detailed advertisement|view advertisement|advertisement|notification|official notice/i.test(label)?0:
+          /\.pdf(?:$|[?#])/i.test(target.href)?1:2;
+        return {url:target.href,priority,label};
+      }catch{return null;}
+    }).filter(Boolean).sort((x,y)=>x.priority-y.priority);
+    const link=linkCandidates[0]?.url||"";
+    if(!link||/(?:userhelp|user-instruction|advertisement-policy|recruitment-rules)/i.test(link))continue;
 
     const key=link+"|"+title;
     if(seen.has(key))continue;
     seen.add(key);
     const dateMatch=rowText.match(/\b\d{1,2}[\/-]\d{1,2}[\/-]\d{4}\b/);
     out.push({
-      title,
-      link,
-      guid:key,
-      summary:clean(rowText,1200),
+      title,link,guid:key,summary:clean(rowText,1200),
       publishedAt:dateMatch?parseOfficialDate(dateMatch[0]):null,
       applicationLastDate:null
     });
@@ -861,7 +876,7 @@ async function syncOfficialMonitors(db,env,dateBudget){
       let host="";
       try{host=new URL(sourceUrl).hostname.toLowerCase();}catch{}
       // Only the exact official hosts configured for this monitor may publish.
-      if(!title||!safeHttpUrl(sourceUrl)||!monitor.hosts.includes(host)||!isUsefulNoticeTitle(title)){
+      if(!title||!safeHttpUrl(sourceUrl)||!monitor.hosts.includes(host)||!isConcreteGovtNotice(title,item.summary||"")){
         skipped++;
         continue;
       }
@@ -937,6 +952,10 @@ async function syncAll(env){
     try{
       const entries=await fetchFeed(source,env);
       for(const item of entries){
+        if(!isConcreteGovtNotice(item.title,item.summary)||IGNORE_RE.test(item.title+" "+item.summary)){
+          rssSkipped++;
+          continue;
+        }
         const guid=(source.feed_url+"|"+item.guid).slice(0,900);
         const summaryDates=extractNoticeDatesFromText(item.summary);
         const summaryDeadline=parseApplicationDeadline(item.summary)||summaryDates.applicationLastDate;
