@@ -22,7 +22,7 @@ function detectCategory(title = "", summary = "") {
   for (const [category, pattern] of rules) if (pattern.test(text)) return category;
   const jobTerms = /\b(recruitment|vacanc(?:y|ies)|apprentice|appointment|hiring|apply online|posts?|jobs?|filling up|walk[- ]?in|engagement|career|applications invited|deputation basis|contract basis|employment notice|employment notification)\b/i;
   if (jobTerms.test(text)) return "latest-jobs";
-  return "latest-jobs";
+  return null;
 }
 
 function isOfficialHost(hostname) {
@@ -372,7 +372,7 @@ async function syncOfficialMonitors(db){
       `).bind(
         fingerprint,
         item.title,
-        detectCategory(item.title, ""),
+        (detectCategory(item.title, "") || "latest-jobs"),
         monitor.name,
         item.link
       ).run();
@@ -413,7 +413,7 @@ async function syncAll(env){
           INSERT OR IGNORE INTO posts
           (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status)
           VALUES(?,?,?,?,?,?,?,'published','pending')
-        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary)==="latest-jobs" && CATEGORY_SET.has(source.category) ? source.category : detectCategory(item.title,item.summary)),source.name,item.link,item.publishedAt).run();
+        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary) || (CATEGORY_SET.has(source.category) ? source.category : "latest-jobs")),source.name,item.link,item.publishedAt).run();
         if(result.meta?.changes)rssInserted++;else rssSkipped++;
       }
       await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
@@ -830,7 +830,7 @@ export default {
             if(!duplicate){
               const slug=await createUniqueSlug(env.DB,item.title);
               await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?, ?,?,?,NULL,'published','pending',?)`)
-                .bind(item.fingerprint,item.title,item.summary||"",detectCategory(item.title,item.summary||""),item.source_name,item.source_url,slug).run();
+                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "latest-jobs"),item.source_name,item.source_url,slug).run();
             }
             await env.DB.prepare("UPDATE review_items SET status='approved' WHERE id=?").bind(id).run();
             return json({ok:true,message:duplicate?"Duplicate notice skipped; review item closed.":"Official notice approved and published."},200,corsOrigin);
@@ -851,7 +851,7 @@ export default {
           let changed=0;
 
           for(const post of rows.results||[]){
-            const category=detectCategory(post.title,post.summary);
+            const category=detectCategory(post.title,post.summary)||post.category;
             // Reclassification must never hide or delete an already published post.
             if(category!==post.category){
               await env.DB.prepare(
