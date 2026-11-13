@@ -543,7 +543,7 @@ body{font-size:14px}
 
 
 /* User-requested list marker beside title and white listing sections */
-.category-list-section,
+.category-listing,
 .search-page-results{
   margin-bottom:14px;
   padding:18px 20px;
@@ -565,6 +565,7 @@ body{font-size:14px}
   padding:9px 12px;
   background:#fff;
   border:1px solid var(--line);
+  border-bottom:none;
   border-radius:7px;
   list-style-type:disc;
 }
@@ -584,7 +585,7 @@ body{font-size:14px}
   margin:0;
   font-size:14px;
   font-weight:500;
-  line-height:1.5;
+  line-height:1.3;
 }
 .category-post-card h2::before,
 .search-result-card h2::before{
@@ -603,4 +604,11 @@ body{font-size:14px}
 .search-result-card h2 a:hover{
   color:#0000ef;
   text-decoration-color:blue;
+}
+
+
+/* Latest requested list item spacing */
+.category-post-card h2 a,
+.search-result-card h2 a{
+  line-height:1.3;
 }
