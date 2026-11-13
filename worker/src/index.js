@@ -158,7 +158,7 @@ function parseApplicationDeadline(value){
 
 const OFFICIAL_DATE_TOKEN = String.raw`(?:\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{4}-\d{1,2}-\d{1,2}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})`;
 
-function extractOfficialNoticeDates(value){
+function extractNoticeDatesFromText(value){
   const text=String(value||"").replace(/\r/g,"");
   const rows=text.split(/\n+/).map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
   const publication=[];
@@ -197,9 +197,10 @@ function extractOfficialNoticeDates(value){
   }
 
   rows.forEach((line,index)=>collect(line,index,"line"));
-  // Also inspect a bounded context for cases where PDF conversion wrapped a label and date onto separate lines.
-  const normalized=text.replace(/\s+/g," ");
-  collect(normalized,rows.length,"context");
+  // Join only adjacent lines so wrapped labels are recognized without mixing dates from the whole document.
+  for(let index=0;index<rows.length-1;index++){
+    collect(rows[index]+" "+rows[index+1],index,"context");
+  }
 
   deadlines.sort((a,b)=>b.score-a.score||b.index-a.index);
   publication.sort((a,b)=>b.score-a.score||a.index-b.index);
@@ -281,7 +282,7 @@ async function convertOfficialDocument(env,url){
 async function extractOfficialNoticeDates(env,url){
   try{
     const page=await convertOfficialDocument(env,url);
-    let extracted=extractOfficialNoticeDates(page.text);
+    let extracted=extractNoticeDatesFromText(page.text);
     let evidence=extracted.evidence;
     let publishedAt=extracted.publishedAt;
     let applicationLastDate=extracted.applicationLastDate;
@@ -291,7 +292,7 @@ async function extractOfficialNoticeDates(env,url){
       for(const pdf of pdfs){
         try{
           const document=await convertOfficialDocument(env,pdf.url);
-          const dates=extractOfficialNoticeDates(document.text);
+          const dates=extractNoticeDatesFromText(document.text);
           if(!publishedAt&&dates.publishedAt){publishedAt=dates.publishedAt;evidence+=" | PDF "+pdf.label+": "+dates.evidence;}
           if(!applicationLastDate&&dates.applicationLastDate){applicationLastDate=dates.applicationLastDate;evidence+=" | PDF "+pdf.label+": "+dates.evidence;}
           if(publishedAt&&applicationLastDate)break;
