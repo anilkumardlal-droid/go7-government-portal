@@ -8,19 +8,19 @@ const CATEGORIES = [
 const CATEGORY_SET = new Set(CATEGORIES.map(x=>x[0]));
 
 function detectCategory(title = "", summary = "") {
-  const text = `${title} ${summary}`.toLowerCase().replace(/[\u2010-\u2015]/g,"-").replace(/\s+/g," ").trim();
+  const text = (String(title) + " " + String(summary)).toLowerCase().replace(/[\u2010-\u2015]/g,"-").replace(/\s+/g," ").trim();
   const rules = [
-    ["answer-keys", /\b(answer\s*keys?|provisional answer|final answer key)\b/],
-    ["admit-cards", /\b(admit\s*cards?|hall tickets?|call letters?|e-admit|download admit)\b/],
-    ["results", /\b(results?|merit\s*lists?|score\s*cards?|cut[- ]?offs?|qualified candidates|selection lists?|selected candidates)\b/],
-    ["documents", /\b(document verification|certificate verification|document upload|important documents|correction window|photo|signature)\b/],
-    ["admissions", /\b(admissions?|entrance applications?|enrolments?|enrollments?|counselling|counseling|seat allotment|university applications?)\b/],
+    ["answer-keys", /\b(answer[\s-]*keys?|response\s*sheets?|objection\s*management|answer\s*key\s*challenge)\b/],
+    ["admit-cards", /\b(admit[\s-]*cards?|hall\s*tickets?|call\s*letters?|e[-\s]*admit|download\s+admit|exam\s+intimation\s+slips?)\b/],
+    ["results", /\b(results?|merit\s*lists?|score\s*cards?|cut[- ]?offs?|qualified candidates|selection\s*(?:lists?|panels?)|selected candidates|short[- ]?listed candidates|shortlisted candidates|provisional selection|final selection)\b/],
+    ["documents", /\b(document verification|certificate verification|document upload|important documents|correction window|photo|signature|verification schedule)\b/],
+    ["admissions", /\b(admissions?|entrance applications?|enrolments?|enrollments?|counselling|counseling|seat allotment|university applications?|admission notice)\b/],
     ["syllabus", /\b(syllabus|exam patterns?)\b/],
     ["outsourcing-jobs", /\b(outsourc(?:e|ed|ing)|manpower|agency based|service provider)\b/],
     ["iti-jobs", /\b(10th pass|class 10|matric|iti|industrial training institute|trade apprentice)\b/]
   ];
   for (const [category, pattern] of rules) if (pattern.test(text)) return category;
-  const jobTerms = /\b(recruitment|vacanc(?:y|ies)|apprentice|appointment|hiring|apply online|posts?|jobs?|filling up|walk[- ]?in|engagement|career|applications invited|deputation basis|contract basis|employment notice|employment notification)\b/i;
+  const jobTerms = /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|apprentice|appointment|hiring|posts?|jobs?|filling up|walk[- ]?in|engagement|career|deputation basis|contract basis|inviting applications)\b/i;
   if (jobTerms.test(text)) return "latest-jobs";
   return null;
 }
@@ -216,6 +216,25 @@ async function fetchFeed(source,env){
 // Official government recruitment pages
 const OFFICIAL_MONITORS = [
   {
+    name:"Employment News - Jobs",
+    category:"latest-jobs",
+    parser:"employment-jobs",
+    urls:["https://employmentnews.gov.in/NewEmp/AllJobs.aspx?k=All"],
+    hosts:["employmentnews.gov.in","www.employmentnews.gov.in"]
+  },
+  {
+    name:"Employment News - Results",
+    category:"results",
+    urls:["https://employmentnews.gov.in/NewEmp/Results.aspx"],
+    hosts:["employmentnews.gov.in","www.employmentnews.gov.in"]
+  },
+  {
+    name:"ISRO Official Careers",
+    category:"latest-jobs",
+    urls:["https://www.isro.gov.in/Careers.html","https://www.isro.gov.in/ViewAllOpportunities.html"],
+    hosts:["www.isro.gov.in","isro.gov.in"]
+  },
+  {
     name:"UPSC Official Recruitment",
     category:"latest-jobs",
     urls:[
@@ -240,16 +259,12 @@ const OFFICIAL_MONITORS = [
       "https://www.rrbcdg.gov.in/employment-notices.php",
       "https://rrbahmedabad.gov.in/exams/"
     ],
-    hosts:[
-      "www.rrbcdg.gov.in",
-      "rrbcdg.gov.in",
-      "rrbahmedabad.gov.in"
-    ]
+    hosts:["www.rrbcdg.gov.in","rrbcdg.gov.in","rrbahmedabad.gov.in"]
   }
 ];
 
 const RECRUITMENT_RE =
-  /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application form|applications invited|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit card|hall ticket|answer key|result|merit list|exam date|exam schedule|apprentice)\b/i;
+  /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam date|exam schedule|skill test|cbt)\b/i;i;
 
 const IGNORE_RE =
   /\b(tender|procurement|quotation|annual report|press release|meeting|photo gallery|celebration|e[-\s]?auction)\b/i;
@@ -295,6 +310,63 @@ function extractOfficialLinks(html,pageUrl,monitor){
   return out;
 }
 
+function extractEmploymentNewsRows(html,pageUrl,monitor){
+  const out=[];
+  const seen=new Set();
+  const rows=String(html||"").match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[];
+
+  for(const row of rows){
+    const cells=[...row.matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
+      .map(match=>cleanFeedContent(match[2],800));
+    if(cells.length<3)continue;
+
+    const rowText=cells.join(" ");
+    if(/issued date|organisation|last date/i.test(cells.slice(0,3).join(" ")))continue;
+
+    const organisation=cells[1]||"";
+    const post=cells[2]||"";
+    const method=cells[3]||"";
+    const lastDate=cells[cells.length-1]||"";
+    if(!organisation||!post||!RECRUITMENT_RE.test(rowText))continue;
+
+    const expiry=lastDate.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})\b/);
+    if(expiry){
+      const expiryTime=new Date(Number(expiry[3]),Number(expiry[2])-1,Number(expiry[1]),23,59,59).getTime();
+      if(Number.isFinite(expiryTime)&&expiryTime<Date.now())continue;
+    }
+
+    const title=clean(organisation+" - "+post,220);
+    if(!isUsefulNoticeTitle(title))continue;
+
+    let link=pageUrl;
+    const hrefs=[...row.matchAll(/<a\b[^>]*href\s*=\s*(["'])(.*?)\1/gi)];
+    for(const match of hrefs){
+      try{
+        const target=new URL(decode(match[2]),pageUrl);
+        if(["http:","https:"].includes(target.protocol)&&monitor.hosts.includes(target.hostname.toLowerCase())){
+          link=target.href;
+          break;
+        }
+      }catch{}
+    }
+
+    const key=link+"|"+title;
+    if(seen.has(key))continue;
+    seen.add(key);
+    out.push({
+      title,
+      link,
+      guid:key,
+      summary:clean("Issued date: "+(cells[0]||"Not shown")+
+        "; appointment: "+(method||"Not shown")+
+        "; last date: "+(lastDate||"Not shown")+". Official Employment News listing.",1200),
+      publishedAt:null
+    });
+  }
+  return out.slice(0,25);
+}
+
+
 
 async function fetchOfficialMonitor(monitor){
   const failures=[];
@@ -324,7 +396,9 @@ async function fetchOfficialMonitor(monitor){
         continue;
       }
 
-      const entries=extractOfficialLinks(html,pageUrl,monitor);
+      const entries=monitor.parser==="employment-jobs"
+        ?extractEmploymentNewsRows(html,pageUrl,monitor)
+        :extractOfficialLinks(html,pageUrl,monitor);
 
 if(entries.length){
   return {
@@ -378,17 +452,18 @@ async function syncOfficialMonitors(db){
     for(const item of result.entries){
       const guid=("official-page|"+item.link).slice(0,900);
 
-      const fingerprint = guid;
+      const fingerprint = ("official-page|" + item.link + "|" + item.title).slice(0,900);
       const duplicate = await db.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
       if (duplicate) { skipped++; continue; }
       const write=await db.prepare(`
         INSERT OR IGNORE INTO review_items
         (fingerprint,title,summary,category,source_name,source_url,status)
-        VALUES(?,?, '', ?,?,?, 'pending')
+        VALUES(?,?,?,?,?,?, 'pending')
       `).bind(
         fingerprint,
         item.title,
-        (detectCategory(item.title, "") || "latest-jobs"),
+        clean(item.summary||"",1200),
+        (detectCategory(item.title, item.summary||"") || monitor.category || "latest-jobs"),
         monitor.name,
         item.link
       ).run();
