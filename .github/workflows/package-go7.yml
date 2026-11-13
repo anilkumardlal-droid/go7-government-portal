@@ -8,6 +8,7 @@ on:
       - fix-post-detail-full-content-20261113
       - fix-content-excerpts-20261113
       - fix-category-menu-routes-20261113
+      - simplify-go7-routes-20261113
       - main
   workflow_dispatch:
 
