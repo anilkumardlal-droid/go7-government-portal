@@ -1,3 +1,4 @@
+
 const CATEGORIES = [
   ["results","Results"], ["admit-cards","Admit Cards"], ["latest-jobs","Latest Jobs"],
   ["answer-keys","Answer Key"], ["documents","Documents"], ["admissions","Admission"],
@@ -410,8 +411,8 @@ async function syncAll(env){
         if(duplicate){rssSkipped++;continue;}
         const result=await env.DB.prepare(`
           INSERT OR IGNORE INTO posts
-          (guid,title,summary,category,source_name,source_url,published_at,status)
-          VALUES(?,?,?,?,?,?,?,'published')
+          (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status)
+          VALUES(?,?,?,?,?,?,?,'published','pending')
         `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary)==="latest-jobs" && CATEGORY_SET.has(source.category) ? source.category : detectCategory(item.title,item.summary)),source.name,item.link,item.publishedAt).run();
         if(result.meta?.changes)rssInserted++;else rssSkipped++;
       }
@@ -462,13 +463,139 @@ async function syncAll(env){
   };
 }
 
+
+
+/* AI NOTICE EXTRACTION ----------------------------------------------------- */
+const AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MISSING = "Not mentioned in official notification";
+
+function htmlToText(html) {
+  return decode(String(html || "")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<(br|\/p|\/div|\/tr|\/li|\/h[1-6])\b[^>]*>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " "))
+    .replace(/[\t ]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n")
+    .trim();
+}
+
+function parseAIJson(value) {
+  let text = String(value || "").trim();
+  text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("AI did not return valid JSON.");
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+async function extractNoticeWithAI(env, post, suppliedText, suppliedSourceUrl) {
+  if (!env.AI || typeof env.AI.run !== "function") throw new Error("Cloudflare Workers AI binding is not configured yet.");
+  const sourceUrl = String(suppliedSourceUrl || post.source_url || "");
+  if (!safeHttpUrl(sourceUrl) || !isOfficialHost(new URL(sourceUrl).hostname)) {
+    throw new Error("Only approved official notice URLs are accepted.");
+  }
+  const text = clean(suppliedText, 50000);
+  if (text.length < 300) throw new Error("Extracted notice text is too short. Please upload a readable PDF.");
+  const notice = { text, finalUrl: sourceUrl, isPdf: true };
+
+  const prompt = `You extract factual recruitment information from official Indian government notifications. Use ONLY the supplied source text. Do not infer or invent facts. Return ONLY valid JSON. For every unavailable field use exactly: "${MISSING}". Keep all values in English. If the notice is not a recruitment notice, set notice_type accordingly and explain briefly in overview. Schema: {"notice_type":"Recruitment|Result|Admit Card|Other","overview":"...","department":"...","post_names":["..."],"total_vacancies":"...","eligibility":"...","educational_qualification":"...","age_limit":"...","age_relaxation":"...","salary":"...","application_fee":"...","important_dates":{"notification_date":"...","start_date":"...","last_date":"...","exam_date":"..."},"selection_process":["..."],"how_to_apply":["..."],"documents_required":["..."],"official_links":[{"label":"...","url":"..."}],"source_evidence":"Briefly identify the relevant wording or section in the source."}.
+
+Notice title: ${clean(post.title, 220)}
+Department/source: ${clean(post.source_name, 120)}
+Official URL: ${notice.finalUrl}
+
+SOURCE TEXT (may be truncated):
+${notice.text.slice(0, 24000)}`;
+  const result = await env.AI.run(AI_MODEL, {
+    messages: [
+      { role: "system", content: "You are a strict document extraction engine. Never fabricate. Return JSON only." },
+      { role: "user", content: prompt }
+    ],
+    max_tokens: 2200,
+    temperature: 0.1
+  });
+  const raw = result?.response || result?.result?.response || result?.output_text || "";
+  const details = parseAIJson(raw);
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    throw new Error("AI returned an unexpected JSON structure.");
+  }
+
+  const arrayFields = new Set([
+    "post_names", "selection_process", "how_to_apply",
+    "documents_required", "official_links"
+  ]);
+  const allowed = [
+    "notice_type", "overview", "department", "post_names",
+    "total_vacancies", "eligibility", "educational_qualification",
+    "age_limit", "age_relaxation", "salary", "application_fee",
+    "important_dates", "selection_process", "how_to_apply",
+    "documents_required", "official_links", "source_evidence"
+  ];
+
+  for (const key of allowed) {
+    if (!(key in details) || details[key] === undefined) {
+      if (arrayFields.has(key)) details[key] = [];
+      else if (key === "important_dates") {
+        details[key] = {
+          notification_date: MISSING,
+          start_date: MISSING,
+          last_date: MISSING,
+          exam_date: MISSING
+        };
+      } else details[key] = MISSING;
+    }
+  }
+
+  if (!details.important_dates || typeof details.important_dates !== "object" || Array.isArray(details.important_dates)) {
+    details.important_dates = {};
+  }
+  for (const dateKey of ["notification_date", "start_date", "last_date", "exam_date"]) {
+    if (!(dateKey in details.important_dates) || details.important_dates[dateKey] == null) {
+      details.important_dates[dateKey] = MISSING;
+    }
+  }
+
+  details.extraction_note = "AI-extracted from the linked official notice. Verify the original notification before applying.";
+  return { details, sourceUrl: notice.finalUrl, isPdf: notice.isPdf };
+}
+
+
+
+/* Stable, readable post slugs. Existing rows are filled lazily without deleting or rewriting content. */
+function slugify(title = "") {
+  return String(title).normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "").slice(0, 90).replace(/-+$/g, "");
+}
+async function createUniqueSlug(db, title) {
+  const base = slugify(title) || "government-update";
+  let slug = base, suffix = 2;
+  while (await db.prepare("SELECT id FROM posts WHERE slug=? LIMIT 1").bind(slug).first()) {
+    slug = `${base}-${suffix++}`;
+  }
+  return slug;
+}
+async function ensurePostSlugs(db, posts) {
+  for (const post of posts) {
+    if (post.slug) continue;
+    let slug = await createUniqueSlug(db, post.title);
+    await db.prepare("UPDATE posts SET slug=? WHERE id=? AND (slug IS NULL OR slug='')")
+      .bind(slug, post.id).run();
+    post.slug = slug;
+  }
+  return posts;
+}
+
 /* WORKER API */
 
 export default {
   async fetch(request,env,ctx){
     const origin=request.headers.get("Origin")||"";
     const allowed=env.ALLOWED_ORIGIN||"https://jobs.go7.in";
-    const corsOrigin=origin===allowed?allowed:allowed;
+    const localPreview=/^http:\/\/(localhost|127\.0\.0\.1):8080$/.test(origin);
+    const corsOrigin=(origin===allowed||localPreview)?origin:allowed;
 
     if(request.method==="OPTIONS"){
       return new Response(null,{
@@ -507,7 +634,7 @@ export default {
 
       if(detailMatch&&request.method==="GET"){
         const post=await env.DB.prepare(
-          "SELECT id,title,summary,category,source_name,source_url,published_at,created_at FROM posts WHERE id=? AND status='published'"
+          "SELECT id,title,summary,category,source_name,source_url,published_at,created_at,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'"
         ).bind(Number(detailMatch[1])).first();
 
         if(!post){
@@ -516,9 +643,13 @@ export default {
 
         const labelMap=Object.fromEntries(CATEGORIES);
 
+        let aiDetails = null;
+        try { aiDetails = post.ai_details_json ? JSON.parse(post.ai_details_json) : null; } catch {}
+        delete post.ai_details_json;
         return json({
           post:{
             ...post,
+            ai_details: aiDetails,
             category_label:labelMap[post.category]||post.category
           }
         },200,corsOrigin);
@@ -547,16 +678,17 @@ export default {
         ).bind(...params).first();
 
         const rows=await env.DB.prepare(`
-          SELECT id,title,summary,category,source_name,source_url,published_at,created_at
+          SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug
           FROM posts WHERE ${where}
           ORDER BY COALESCE(published_at,created_at) DESC
           LIMIT ? OFFSET ?
         `).bind(...params,limit,offset).all();
 
         const labelMap=Object.fromEntries(CATEGORIES);
+        const posts=await ensurePostSlugs(env.DB,rows.results||[]);
 
         return json({
-          posts:(rows.results||[]).map(p=>({
+          posts:posts.map(p=>({
             ...p,
             category_label:labelMap[p.category]||p.category
           })),
@@ -570,6 +702,37 @@ export default {
           return json({
             error:"Unauthorized. Check your admin token."
           },401,corsOrigin);
+        }
+
+        if (path === "/api/admin/ai/pending" && request.method === "GET") {
+          const rows = await env.DB.prepare("SELECT id,title,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts WHERE status='published' AND category='latest-jobs' ORDER BY created_at DESC LIMIT 50").all();
+          return json({ items: rows.results || [] }, 200, corsOrigin);
+        }
+
+        const extractTextMatch = path.match(/^\/api\/admin\/posts\/(\d+)\/extract-text$/);
+        if (extractTextMatch && request.method === "POST") {
+          const post = await env.DB.prepare("SELECT id,title,source_name,source_url,category FROM posts WHERE id=? AND status='published'").bind(Number(extractTextMatch[1])).first();
+          if (!post) return json({ error: "Published post not found." }, 404, corsOrigin);
+          if (post.category !== "latest-jobs") return json({ error: "AI notice extraction is only enabled for Latest Jobs." }, 400, corsOrigin);
+          const body = await request.json();
+          const text = String(body.text || "");
+          const sourceUrl = String(body.source_url || post.source_url || "");
+          if (text.length > 50000) return json({ error: "Extracted text exceeds the 50,000 character limit." }, 413, corsOrigin);
+          if (text.trim().length < 300) return json({ error: "PDF text is too short. Please use a readable official PDF." }, 400, corsOrigin);
+          if (sourceUrl !== post.source_url) return json({ error: "Source URL does not match the published post." }, 400, corsOrigin);
+          await env.DB.prepare("UPDATE posts SET ai_extraction_status='processing', ai_extraction_error=NULL WHERE id=?").bind(post.id).run();
+          try {
+            const extracted = await extractNoticeWithAI(env, post, text, sourceUrl);
+            await env.DB.prepare("UPDATE posts SET ai_details_json=?, ai_extraction_status='completed', ai_extracted_at=CURRENT_TIMESTAMP, ai_extraction_error=NULL WHERE id=?").bind(JSON.stringify(extracted.details), post.id).run();
+            return json({ id: post.id, status: "completed", message: "AI extraction completed and saved." }, 200, corsOrigin);
+          } catch (error) {
+            await env.DB.prepare("UPDATE posts SET ai_extraction_status='failed', ai_extraction_error=? WHERE id=?").bind(clean(error.message, 500), post.id).run();
+            return json({ id: post.id, status: "failed", error: clean(error.message, 300) }, 422, corsOrigin);
+          }
+        }
+
+        if(path==="/api/admin/ai/extract-pending"&&request.method==="POST"){
+          return json({ processed: 0, message: "PDF extraction now runs from the Admin Panel after a PDF is selected. Automatic PDF processing is disabled to prevent Worker CPU-limit errors." }, 200, corsOrigin);
         }
 
         if(path==="/api/admin/health"&&request.method==="GET"){
@@ -618,7 +781,8 @@ export default {
           const host=new URL(source_url).hostname;
           if(!isOfficialHost(host)) return json({error:"Manual posts must link to an official .gov.in, .nic.in, .ac.in or .edu.in source."},400,corsOrigin);
           const guid="manual|"+crypto.randomUUID();
-          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published')").bind(guid,title,summary,category,source_name,source_url).run();
+          const slug=await createUniqueSlug(env.DB,title);
+          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published','pending',?)").bind(guid,title,summary,category,source_name,source_url,slug).run();
           return json({ok:true,id:result.meta?.last_row_id,message:"Post published."},201,corsOrigin);
         }
 
@@ -643,8 +807,9 @@ export default {
             if(!isOfficialHost(host)||!isUsefulNoticeTitle(item.title)) return json({error:"Notice title or source link failed the official-source checks."},400,corsOrigin);
             const duplicate=await env.DB.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
             if(!duplicate){
-              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status) VALUES(?,?,?, ?,?,?,NULL,'published')`)
-                .bind(item.fingerprint,item.title,item.summary||"",detectCategory(item.title,item.summary||""),item.source_name,item.source_url).run();
+              const slug=await createUniqueSlug(env.DB,item.title);
+              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?, ?,?,?,NULL,'published','pending',?)`)
+                .bind(item.fingerprint,item.title,item.summary||"",detectCategory(item.title,item.summary||""),item.source_name,item.source_url,slug).run();
             }
             await env.DB.prepare("UPDATE review_items SET status='approved' WHERE id=?").bind(id).run();
             return json({ok:true,message:duplicate?"Duplicate notice skipped; review item closed.":"Official notice approved and published."},200,corsOrigin);
@@ -695,6 +860,9 @@ export default {
   },
 
   async scheduled(controller,env,ctx){
-    ctx.waitUntil(syncAll(env).catch(error => console.error("GO7 scheduled sync failed:", error)));
+    ctx.waitUntil((async()=>{
+      await syncAll(env);
+      // AI PDF extraction is intentionally manual from the Admin Panel.
+    })().catch(error => console.error("GO7 scheduled sync / AI extraction failed:", error)));
   }
 };
