@@ -34,7 +34,8 @@ function isOfficialHost(hostname) {
 function isUsefulNoticeTitle(title) {
   const value = clean(title, 220).toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
   if (value.length < 16) return false;
-  return !/^(download )?(admit card|hall ticket|notice|notification|recruitment|advertisement|click here|read more|latest update|important notice)$/.test(value);
+  return !/^(download )?(admit card|hall ticket|notice|notification|recruitment|advertisement|click here|read more|latest update|important notice|web advertisement|new advertisement policy|advertisement policy)$/.test(value)
+    && !/^(web advertisement|new advertisement policy|advertisement policy)\b/.test(value);
 }
 
 const json = (data,status=200,origin="*") => new Response(JSON.stringify(data),{
