@@ -453,6 +453,42 @@ const OFFICIAL_MONITORS = [
     hosts:["rrb.indianrailways.gov.in","www.rrb.indianrailways.gov.in"]
   },
   {
+    name:"Railway RRB Prayagraj - Uttar Pradesh",
+    category:"jobs-vacancies",
+    urls:["https://rrbpry.gov.in/"],
+    hosts:["rrbpry.gov.in","www.rrbpry.gov.in"]
+  },
+  {
+    name:"Railway RRB Patna - Bihar",
+    category:"jobs-vacancies",
+    urls:["https://rrbpatna.gov.in/"],
+    hosts:["rrbpatna.gov.in","www.rrbpatna.gov.in"]
+  },
+  {
+    name:"Railway RRB Ranchi - Jharkhand",
+    category:"jobs-vacancies",
+    urls:["https://rrbranchi.gov.in/"],
+    hosts:["rrbranchi.gov.in","www.rrbranchi.gov.in"]
+  },
+  {
+    name:"Railway RRB Kolkata - West Bengal",
+    category:"jobs-vacancies",
+    urls:["https://rrbkolkata.gov.in/"],
+    hosts:["rrbkolkata.gov.in","www.rrbkolkata.gov.in"]
+  },
+  {
+    name:"Railway RRB Bilaspur - Chhattisgarh",
+    category:"jobs-vacancies",
+    urls:["https://rrbbilaspur.gov.in/"],
+    hosts:["rrbbilaspur.gov.in","www.rrbbilaspur.gov.in"]
+  },
+  {
+    name:"Railway RRB Bhubaneswar - Odisha",
+    category:"jobs-vacancies",
+    urls:["https://rrbbbs.gov.in/"],
+    hosts:["rrbbbs.gov.in","www.rrbbbs.gov.in"]
+  },
+  {
     name:"UPPSC Notifications",
     category:"jobs-vacancies",
     parser:"table",
@@ -556,7 +592,7 @@ const OFFICIAL_MONITORS = [
 ];
 
 const RECRUITMENT_RE =
-  /\b(advt?\.?\s*no\.?|advertisement\s+no\.?|recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam date|exam schedule|skill test|cbt)\b/i;
+  /\b(advt?\.?\s*no\.?|advertisement\s+no\.?|recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam(?:ination)? date|exam(?:ination)? schedule|skill test|cbt|corrigendum|postpon(?:ed|ement)|personality test|written test|preliminary examination|main examination|provisional result|final result)\b/i;
 
 const IGNORE_RE =
   /\b(tender|procurement|quotation|annual report|press release|meeting|photo gallery|celebration|e[-\s]?auction)\b/i;
