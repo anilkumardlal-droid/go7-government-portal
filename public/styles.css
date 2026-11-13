@@ -298,3 +298,42 @@ button.primary:hover{background:#1d416e;border-color:#1d416e}
 button.secondary:hover{background:#eef3fa;border-color:#b9c9df}
 button.is-loading{opacity:.9;cursor:wait}
 button.is-loading::before{content:"";width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:go7-refresh-spin .7s linear infinite}
+
+
+/* User-approved final footer spacing, type and consistent search input */
+.site-footer{padding:20px}
+.footer-inner{padding:0}
+.footer-brand strong{font-size:30px;font-weight:500;letter-spacing:-.6px;padding:10px}
+.footer-brand span,.footer-heading,.footer-links a,.footer-copyright{
+  font-size:13px;font-weight:500;line-height:1.5
+}
+.footer-pages{gap:8px}
+.footer-links{gap:14px}
+.footer-copyright{white-space:normal}
+.search-form,.search-page-form{
+  display:flex;align-items:stretch;gap:8px;width:min(640px,100%);max-width:640px;
+  padding:5px;border:1px solid #dbe2ec;border-radius:8px;background:#fff;
+  box-shadow:none;transition:border-color .2s ease,box-shadow .2s ease
+}
+.search-form input,.search-page-form input{
+  flex:1;min-width:0;padding:10px 12px;border:0;border-radius:6px;
+  outline:0;color:var(--ink);font-size:15px;background:transparent
+}
+.search-form button,.search-page-form button{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  padding:10px 16px;border:0;border-radius:7px;background:var(--red);
+  color:#fff;font-size:14px;font-weight:600;cursor:pointer
+}
+.search-form button:hover,.search-page-form button:hover{background:#b81725}
+.search-form:focus-within,.search-page-form:focus-within{
+  border-color:#4b78b7;box-shadow:0 0 0 3px rgba(75,120,183,.17)
+}
+@media(max-width:760px){
+  .site-footer{padding:20px}
+  .footer-inner{display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:0}
+  .footer-pages{width:100%}
+  .footer-links{gap:10px 14px}
+  .footer-copyright{width:100%;text-align:left;white-space:normal}
+  .search-form,.search-page-form{width:100%;max-width:none}
+  .search-form button,.search-page-form button{padding:9px 12px}
+}
