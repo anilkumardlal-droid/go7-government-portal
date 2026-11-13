@@ -283,3 +283,18 @@ button:active,.primary-button:active,.secondary-button:active,.search-form butto
  .search-page-form button{padding:9px 12px}
 }
 @media(max-width:390px){.header-search{font-size:11px;padding:6px 8px}.search-result-list{grid-template-columns:1fr}}
+
+
+/* Private console controls and paragraph readability */
+.hero-trust{font-size:14px}
+.admin-actions button,.panel button.primary,.panel button.secondary{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:38px;padding:9px 13px;border:1px solid #d5dfec;border-radius:8px;
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .18s ease
+}
+button.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+button.secondary{background:#fff;border-color:#d5dfec;color:var(--navy)}
+button.primary:hover{background:#1d416e;border-color:#1d416e}
+button.secondary:hover{background:#eef3fa;border-color:#b9c9df}
+button.is-loading{opacity:.9;cursor:wait}
+button.is-loading::before{content:"";width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:go7-refresh-spin .7s linear infinite}
