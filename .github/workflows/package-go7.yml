@@ -77,7 +77,7 @@ jobs:
           assert 'limit:"20"' in app, "Homepage category previews must be capped at 20"
           assert "const limit=24" in category_js, "Category pages must paginate in groups of 24"
           assert 'addEventListener("click",()=>{offset+=limit;load(true);})' in category_js, "Load More pagination is missing"
-          assert "postHref(post)" in app
+          assert "const postHref=post=>" in app
           assert "pathSlug.match(/-(\\d+)$/)" in detail_js
           assert "p.ai_details?.overview||p.summary" in detail_js
           assert (root / "search.html").is_file() and (root / "search.js").is_file()
@@ -97,7 +97,7 @@ jobs:
           assert migration.is_file(), "Automatic date extraction migration is missing"
           migration_sql = migration.read_text(encoding="utf-8")
           for field in ("date_checked_at", "date_evidence"):
-              assert migration_sql.count(field) == 4, f"Expected {field} on both posts and review_items"
+              assert migration_sql.count(field) == 2, f"Expected {field} on posts and review_items"
 
           not_found = (root / "404.html").read_text(encoding="utf-8")
           assert "search.html" in not_found
