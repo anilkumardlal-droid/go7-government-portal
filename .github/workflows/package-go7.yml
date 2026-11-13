@@ -18,6 +18,8 @@ jobs:
       - name: Validate JavaScript and XML
         run: |
           node --check public/app.js
+          node --check public/search.js
+          node --check public/admin.js
           node --check public/site.js
           node --check public/category.js
           node --check public/detail.js
@@ -34,7 +36,18 @@ jobs:
           index = (root / "index.html").read_text(encoding="utf-8")
           assert "latest-all" not in index
           assert "View All" in index
-          print("HTML route and sitemap checks passed")
+          assert index.count('class="panel-refresh"') == 9, "Every homepage category needs a refresh control"
+          assert "panel-footer" in index, "View All links should sit at the bottom-right of each category panel"
+          assert 'action="/search.html"' in index, "Homepage search must lead to the dedicated search page"
+          assert (root / "search.html").is_file() and (root / "search.js").is_file(), "Dedicated search page files are missing"
+          not_found = (root / "404.html").read_text(encoding="utf-8")
+          assert "not-found-home" not in not_found, "404 homepage button should be removed"
+          assert "search.html" in not_found, "404 search form must open the search page"
+          styles = (root / "styles.css").read_text(encoding="utf-8")
+          assert "box-shadow:none!important" in styles, "Post links must not use shadows"
+          assert ".detail-title{font-size:20px;font-weight:600" in styles, "Post title typography does not match the approved spec"
+          assert "© 2026 GO7. Independent information service." in index
+          print("HTML route, design and sitemap checks passed")
           PY
       - name: Assemble complete project ZIP
         run: |
