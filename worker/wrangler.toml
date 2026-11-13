@@ -3,6 +3,10 @@ main = "src/index.js"
 compatibility_date = "2026-11-11"
 workers_dev = true
 
+[[routes]]
+pattern = "jobs.go7.in/sitemap*"
+zone_name = "go7.in"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "go7-gov-db"
