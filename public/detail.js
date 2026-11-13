@@ -4,12 +4,14 @@
  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const nice=s=>String(s||"").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
  const date=s=>{if(!s)return"Not provided";const d=new Date(s);return Number.isNaN(d.getTime())?"Not provided":d.toLocaleString("en-IN",{timeZone:"Asia/Kolkata",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:true})+" IST";};
- const slugParam=new URLSearchParams(location.search).get("slug");
+ const params=new URLSearchParams(location.search);
+ const slugParam=params.get("slug");
  const pathParts=location.pathname.split("/").filter(Boolean);
- const pathSlug=pathParts[0]==="detail"?(pathParts[1]||""):(pathParts.length===1?pathParts[0]:"");
- const categorySlugs=["latest-jobs","results","admit-cards","answer-keys","documents","admissions","iti-jobs","outsourcing-jobs","syllabus"];
- const slug=slugParam||((pathSlug&&!pathSlug.includes(".")&&!categorySlugs.includes(pathSlug))?pathSlug:"");
- const id=new URLSearchParams(location.search).get("id");
+ const isDetailPath=pathParts[0]==="detail";
+ const pathSlug=isDetailPath?(pathParts[1]||""):(pathParts.length===1?pathParts[0]:"");
+ const routeIdMatch=isDetailPath?pathSlug.match(/-(\d+)$/):null;
+ const slug=slugParam||(pathSlug&&!routeIdMatch&&!pathSlug.includes(".")?pathSlug:"");
+ const id=params.get("id")||(routeIdMatch?routeIdMatch[1]:"");
  const status=$("detailStatus");
  const hasValue=v=>{if(v===null||v===undefined)return false;if(typeof v==="string")return v.trim()!==""&&!/^not mentioned in official notification$/i.test(v.trim())&&!/^not provided$/i.test(v.trim());if(Array.isArray(v))return v.length>0;if(typeof v==="object")return Object.values(v).some(hasValue);return true;};
  const valueHtml=v=>Array.isArray(v)?'<ul>'+v.filter(hasValue).map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul>':esc(v);
@@ -38,7 +40,14 @@
   if(!r.ok)throw Error(r.status===404?"This update could not be found.":"The update service is temporarily unavailable.");
   const data=await r.json(),p=data.post;if(!p)throw Error("Update not found.");
   document.title=(p.title||"Update Details")+" | Jobs GO7";
-  const canonical=document.querySelector('link[rel="canonical"]');if(canonical)canonical.href="https://jobs.go7.in/detail/"+encodeURIComponent(p.slug||slug||"")+"/";
+  const base=String(p.slug||p.title||"government-update").normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")
+    .slice(0,90).replace(/-+$/g,"")||"government-update";
+  const permalink="/detail/"+encodeURIComponent(base+"-"+p.id)+"/";
+  const canonical=document.querySelector('link[rel="canonical"]');
+  if(canonical)canonical.href="https://jobs.go7.in"+permalink;
+  if(location.pathname+location.search!==permalink)history.replaceState(null,"",permalink);
   $("detailBreadcrumb").innerHTML=' › <a href="/'+esc(p.category)+'/">'+esc(p.category_label||p.category||"Updates")+'</a> › '+esc(p.title||"Details");
   $("detailCategory").textContent=p.category_label||p.category||"GO7 Update";
   $("detailTitle").textContent=p.title||"Government Update";
