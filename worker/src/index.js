@@ -150,6 +150,12 @@ function parseOfficialDate(value){
   return `${String(year).padStart(4,"0")}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
 }
 
+function parseApplicationDeadline(value){
+  const text=String(value||"");
+  const match=text.match(/(?:last\s+date(?:\s+to\s+apply)?|closing\s+date|application\s+deadline|apply\s+before)\s*[:\-–]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}|\d{4}-\d{2}-\d{2})/i);
+  return match?parseOfficialDate(match[1]):null;
+}
+
 function safeHttpUrl(value){
   try{
     const u=new URL(value);
@@ -523,22 +529,24 @@ async function syncAll(env){
       const entries=await fetchFeed(source,env);
       for(const item of entries){
         const guid=(source.feed_url+"|"+item.guid).slice(0,900);
-        const duplicate=await env.DB.prepare("SELECT id,summary FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+        const deadline=parseApplicationDeadline(item.summary);
+        const duplicate=await env.DB.prepare("SELECT id,summary,published_at,application_last_date FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
         if(duplicate){
           const incomingSummary=String(item.summary||"").trim();
           const storedSummary=String(duplicate.summary||"").trim();
-          // A later feed run may expose the publisher's full content: upgrade only when it is longer.
-          if(incomingSummary.length>storedSummary.length){
-            await env.DB.prepare("UPDATE posts SET summary=? WHERE id=?").bind(incomingSummary,duplicate.id).run();
+          // Enrich duplicates only with longer official content and verified dates.
+          if(incomingSummary.length>storedSummary.length||(item.publishedAt&&!duplicate.published_at)||(deadline&&!duplicate.application_last_date)){
+            await env.DB.prepare("UPDATE posts SET summary=CASE WHEN length(?)>length(summary) THEN ? ELSE summary END,published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
+              .bind(incomingSummary,incomingSummary,item.publishedAt||null,deadline,duplicate.id).run();
           }
           rssSkipped++;
           continue;
         }
         const result=await env.DB.prepare(`
           INSERT OR IGNORE INTO posts
-          (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status)
-          VALUES(?,?,?,?,?,?,?,'published','pending')
-        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary) || (CATEGORY_SET.has(source.category) ? source.category : "jobs-vacancies")),source.name,item.link,item.publishedAt).run();
+          (guid,title,summary,category,source_name,source_url,published_at,application_last_date,status,ai_extraction_status)
+          VALUES(?,?,?,?,?,?,?,?,'published','pending')
+        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary) || (CATEGORY_SET.has(source.category) ? source.category : "jobs-vacancies")),source.name,item.link,item.publishedAt,deadline).run();
         if(result.meta?.changes)rssInserted++;else rssSkipped++;
       }
       await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
@@ -923,13 +931,18 @@ export default {
           const body=await request.json();
           const title=clean(body.title,220), summary=clean(body.summary,1200), source_name=clean(body.source_name||"GO7 Admin",100);
           const source_url=String(body.source_url||"").trim(), category=String(body.category||"");
+          const rawPublished=String(body.published_at||"").trim(),rawDeadline=String(body.application_last_date||"").trim();
+          const publishedAt=rawPublished?parseOfficialDate(rawPublished):null;
+          const applicationLastDate=rawDeadline?parseOfficialDate(rawDeadline):null;
+          if(rawPublished&&!publishedAt)return json({error:"Enter a valid official publication date."},400,corsOrigin);
+          if(rawDeadline&&!applicationLastDate)return json({error:"Enter a valid application last date."},400,corsOrigin);
           if(!title || !CATEGORY_SET.has(category) || !safeHttpUrl(source_url)) return json({error:"Valid title, category and official HTTP(S) source URL are required."},400,corsOrigin);
           const host=new URL(source_url).hostname;
           if(!isOfficialHost(host)) return json({error:"Manual posts must link to an official .gov.in, .nic.in, .ac.in or .edu.in source."},400,corsOrigin);
           const guid="manual|"+crypto.randomUUID();
           const finalCategory=detectCategory(title,summary)||category;
           const slug=await createUniqueSlug(env.DB,title);
-          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published','pending',?)").bind(guid,title,summary,finalCategory,source_name,source_url,slug).run();
+          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,application_last_date,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,?,?, 'published','pending',?)").bind(guid,title,summary,finalCategory,source_name,source_url,publishedAt,applicationLastDate,slug).run();
           return json({ok:true,id:result.meta?.last_row_id,message:"Post published."},201,corsOrigin);
         }
 
