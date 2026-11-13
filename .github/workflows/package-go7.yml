@@ -90,7 +90,12 @@ jobs:
           assert "function officialPdfLinks" in worker_js, "Official PDF discovery is missing"
           assert "extractNoticeDatesFromText" in worker_js
           assert "syncOfficialMonitors(env.DB,env,dateBudget)" in worker_js
-          assert "const dateBudget={used:0,max:8}" in worker_js
+          assert "const dateBudget={used:0,max:2}" in worker_js
+          assert "const OFFICIAL_MONITOR_BATCH_SIZE = 6" in worker_js
+          assert "official_monitor_cursor" in worker_js
+          rotation_migration = worker / "migrations/0009_sync_rotation.sql"
+          assert rotation_migration.is_file(), "Official monitor rotation migration is missing"
+          assert "CREATE TABLE IF NOT EXISTS sync_state" in rotation_migration.read_text(encoding="utf-8")
           assert "12*60*60*1000" in worker_js, "Date extraction cooldown is missing"
 
           migration = worker / "migrations/0008_auto_notice_date_extraction.sql"
