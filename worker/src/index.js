@@ -1,8 +1,11 @@
 
 const CATEGORIES = [
-  ["results","Results"], ["admit-cards","Admit Cards"], ["latest-jobs","Latest Jobs"],
-  ["answer-keys","Answer Key"], ["documents","Documents"], ["admissions","Admission"],
-  ["iti-jobs","10th/ITI Jobs"], ["outsourcing-jobs","Outsourcing Jobs"], ["syllabus","Syllabus"]
+  ["jobs-vacancies","Jobs & Vacancies"],
+  ["results","Results"],
+  ["admit-cards-exams","Admit Cards & Exams"],
+  ["answer-keys","Answer Keys"],
+  ["admissions-education","Admissions & Education"],
+  ["important-notices","Important Notices"]
 ];
 
 const CATEGORY_SET = new Set(CATEGORIES.map(x=>x[0]));
@@ -11,17 +14,15 @@ function detectCategory(title = "", summary = "") {
   const text = (String(title) + " " + String(summary)).toLowerCase().replace(/[\u2010-\u2015]/g,"-").replace(/\s+/g," ").trim();
   const rules = [
     ["answer-keys", /\b(answer[\s-]*keys?|response\s*sheets?|objection\s*management|answer\s*key\s*challenge)\b/],
-    ["admit-cards", /\b(admit[\s-]*cards?|hall\s*tickets?|call\s*letters?|e[-\s]*admit|download\s+admit|exam\s+intimation\s+slips?)\b/],
-    ["results", /\b(results?|merit\s*lists?|score\s*cards?|cut[- ]?offs?|qualified candidates|selection\s*(?:lists?|panels?)|selected candidates|short[- ]?listed candidates|shortlisted candidates|provisional selection|final selection)\b/],
-    ["documents", /\b(document verification|certificate verification|document upload|important documents|correction window|photo|signature|verification schedule)\b/],
-    ["admissions", /\b(admissions?|entrance applications?|enrolments?|enrollments?|counselling|counseling|seat allotment|university applications?|admission notice)\b/],
-    ["syllabus", /\b(syllabus|exam patterns?)\b/],
-    ["outsourcing-jobs", /\b(outsourc(?:e|ed|ing)|manpower|agency based|service provider)\b/],
-    ["iti-jobs", /\b(10th pass|class 10|matric|iti|industrial training institute|trade apprentice)\b/]
+    ["admit-cards-exams", /\b(admit[\s-]*cards?|hall\s*tickets?|call\s*letters?|e[-\s]*admit|exam\s+intimation|exam\s+city|city\s+intimation|exam\s+date|exam\s+schedule|examination\s+schedule|skill\s+test\s+schedule)\b/],
+    ["results", /\b(results?|merit\s*lists?|score\s*cards?|cut[- ]?offs?|qualified candidates|selection\s*(?:lists?|panels?)|selected candidates|short[- ]?listed candidates|shortlisted candidates|provisional selection|final selection|result\s+of)\b/],
+    ["admissions-education", /\b(admissions?|entrance applications?|enrolments?|enrollments?|counselling|counseling|seat allotment|university applications?|admission notice|syllabus|exam patterns?|information bulletin|academic session)\b/],
+    ["important-notices", /\b(document verification|certificate verification|document upload|important documents|correction window|photo|signature|verification schedule|status of (?:lateral )?recruitment cases|recruitment tests|recruitment requisition|recruitment cases kept on hold|administrative notice|corrigendum|extension notice|office order)\b/],
+    ["jobs-vacancies", /\b(10th pass|class 10|matric|iti|industrial training institute|trade apprentice|outsourc(?:e|ed|ing)|manpower|agency based|service provider)\b/]
   ];
   for (const [category, pattern] of rules) if (pattern.test(text)) return category;
-  const jobTerms = /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|apprentice|appointment|hiring|posts?|jobs?|filling up|walk[- ]?in|engagement|career|deputation basis|contract basis|inviting applications)\b/i;
-  if (jobTerms.test(text)) return "latest-jobs";
+  const jobTerms = /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|applications?|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|apprentice|appointment|hiring|posts?|jobs?|filling up|walk[- ]?in|engagement|career|deputation basis|contract basis|inviting applications|young professional|consultant)\b/i;
+  if (jobTerms.test(text)) return "jobs-vacancies";
   return null;
 }
 
@@ -217,7 +218,7 @@ async function fetchFeed(source,env){
 const OFFICIAL_MONITORS = [
   {
     name:"Employment News - Jobs",
-    category:"latest-jobs",
+    category:"jobs-vacancies",
     parser:"employment-jobs",
     urls:["https://employmentnews.gov.in/NewEmp/AllJobs.aspx?k=All"],
     hosts:["employmentnews.gov.in","www.employmentnews.gov.in"]
@@ -230,13 +231,13 @@ const OFFICIAL_MONITORS = [
   },
   {
     name:"ISRO Official Careers",
-    category:"latest-jobs",
+    category:"jobs-vacancies",
     urls:["https://www.isro.gov.in/Careers.html","https://www.isro.gov.in/CurrentOpportunities.html","https://www.isro.gov.in/ViewAllOpportunities.html"],
     hosts:["www.isro.gov.in","isro.gov.in"]
   },
   {
     name:"UPSC Official Recruitment",
-    category:"latest-jobs",
+    category:"jobs-vacancies",
     urls:[
       "https://www.upsc.gov.in/recruitment/recruitment-advertisement",
       "https://cms.upsc.gov.in/archived-advertisements/"
@@ -245,7 +246,7 @@ const OFFICIAL_MONITORS = [
   },
   {
     name:"SSC Official Notices",
-    category:"latest-jobs",
+    category:"jobs-vacancies",
     urls:[
       "https://ssc.gov.in/",
       "https://ssccr.gov.in/announcements"
@@ -254,7 +255,7 @@ const OFFICIAL_MONITORS = [
   },
   {
     name:"Railway RRB Employment Notices",
-    category:"latest-jobs",
+    category:"jobs-vacancies",
     urls:[
       "https://www.rrbcdg.gov.in/employment-notices.php",
       "https://rrbahmedabad.gov.in/exams/"
@@ -463,7 +464,7 @@ async function syncOfficialMonitors(db){
         fingerprint,
         item.title,
         clean(item.summary||"",1200),
-        (detectCategory(item.title, item.summary||"") || monitor.category || "latest-jobs"),
+        (detectCategory(item.title, item.summary||"") || monitor.category || "jobs-vacancies"),
         monitor.name,
         item.link
       ).run();
@@ -513,7 +514,7 @@ async function syncAll(env){
           INSERT OR IGNORE INTO posts
           (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status)
           VALUES(?,?,?,?,?,?,?,'published','pending')
-        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary) || (CATEGORY_SET.has(source.category) ? source.category : "latest-jobs")),source.name,item.link,item.publishedAt).run();
+        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary) || (CATEGORY_SET.has(source.category) ? source.category : "jobs-vacancies")),source.name,item.link,item.publishedAt).run();
         if(result.meta?.changes)rssInserted++;else rssSkipped++;
       }
       await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
@@ -834,7 +835,7 @@ export default {
         if (extractTextMatch && request.method === "POST") {
           const post = await env.DB.prepare("SELECT id,title,source_name,source_url,category FROM posts WHERE id=? AND status='published'").bind(Number(extractTextMatch[1])).first();
           if (!post) return json({ error: "Published post not found." }, 404, corsOrigin);
-          if (post.category !== "latest-jobs") return json({ error: "AI notice extraction is only enabled for Latest Jobs." }, 400, corsOrigin);
+          if (post.category !== "jobs-vacancies") return json({ error: "AI notice extraction is only enabled for Jobs & Vacancies." }, 400, corsOrigin);
           const body = await request.json();
           const text = String(body.text || "");
           const sourceUrl = String(body.source_url || post.source_url || "");
@@ -931,7 +932,7 @@ export default {
             if(!duplicate){
               const slug=await createUniqueSlug(env.DB,item.title);
               await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?, ?,?,?,NULL,'published','pending',?)`)
-                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "latest-jobs"),item.source_name,item.source_url,slug).run();
+                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "jobs-vacancies"),item.source_name,item.source_url,slug).run();
             }
             await env.DB.prepare("UPDATE review_items SET status='approved' WHERE id=?").bind(id).run();
             return json({ok:true,message:duplicate?"Duplicate notice skipped; review item closed.":"Official notice approved and published."},200,corsOrigin);
