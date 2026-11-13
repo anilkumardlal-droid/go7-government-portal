@@ -611,3 +611,79 @@ body{font-size:14px}
 .search-result-card h2 a{
   line-height:1.3;
 }
+
+
+/* Consistent title markers on category pages, search and home category panels */
+.category-post-grid,
+.search-result-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.category-post-card,
+.search-result-card{
+  display:flex;
+  align-items:flex-start;
+  min-width:0;
+  padding:9px 12px;
+  background:#fff;
+  border:0;
+  border-radius:7px;
+  list-style:none;
+}
+.post-list-marker{
+  display:inline-block;
+  flex:0 0 auto;
+  margin-right:8px;
+  color:#102a50;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.3;
+  text-decoration:none;
+}
+.category-post-card h2,
+.search-result-card h2{
+  display:block;
+  flex:1 1 auto;
+  min-width:0;
+  margin:0;
+  font-size:14px;
+  font-weight:500;
+  line-height:1.3;
+}
+.category-post-card h2 a,
+.search-result-card h2 a{
+  display:inline;
+  color:#0000ef;
+  text-decoration-line:underline;
+  text-decoration-color:blue;
+  text-underline-offset:2px;
+  overflow-wrap:anywhere;
+  line-height:1.3;
+}
+.category-post-card h2 a:hover,
+.search-result-card h2 a:hover{
+  color:#0000ef;
+  text-decoration-color:blue;
+}
+.home-category-panel .panel-body .post-link{
+  text-decoration:none;
+}
+.home-category-panel .panel-body .post-list-marker{
+  margin-right:8px;
+  color:#102a50;
+  font-size:15px;
+  font-weight:700;
+  line-height:1.3;
+  text-decoration:none;
+}
+.home-category-panel .panel-body .home-post-title{
+  color:#0000ef;
+  text-decoration-line:underline;
+  text-decoration-color:blue;
+  text-underline-offset:2px;
+  line-height:1.3;
+}
