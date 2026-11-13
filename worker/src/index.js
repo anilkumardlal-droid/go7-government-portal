@@ -626,19 +626,16 @@ failures.push(
 }
 
 
-async function syncOfficialMonitors(db){
+async function syncOfficialMonitors(db,env,dateBudget){
   let inserted=0;
   let skipped=0;
+  let dateChecks=0;
   const errors=[];
-
-  const results=await Promise.all(
-    OFFICIAL_MONITORS.map(m=>fetchOfficialMonitor(m))
-  );
+  const results=await Promise.all(OFFICIAL_MONITORS.map(m=>fetchOfficialMonitor(m)));
 
   for(let i=0;i<OFFICIAL_MONITORS.length;i++){
     const monitor=OFFICIAL_MONITORS[i];
     const result=results[i];
-
     if(result.error){
       errors.push(`${monitor.name}: ${result.error}`);
       await db.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'error',CURRENT_TIMESTAMP,NULL,?) ON CONFLICT(source_name) DO UPDATE SET status='error',last_checked_at=CURRENT_TIMESTAMP,last_error=excluded.last_error").bind(monitor.name,clean(result.error,500)).run();
@@ -647,88 +644,107 @@ async function syncOfficialMonitors(db){
     await db.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'ok',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL) ON CONFLICT(source_name) DO UPDATE SET status='ok',last_checked_at=CURRENT_TIMESTAMP,last_success_at=CURRENT_TIMESTAMP,last_error=NULL").bind(monitor.name).run();
 
     for(const item of result.entries){
-      const guid=("official-page|"+item.link).slice(0,900);
+      const fingerprint=("official-page|"+item.link+"|"+item.title).slice(0,900);
+      const duplicate=await db.prepare("SELECT id,published_at,application_last_date,date_checked_at,date_evidence FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+      const existingReview=await db.prepare("SELECT id,published_at,application_last_date,date_checked_at,date_evidence FROM review_items WHERE fingerprint=? AND status='pending'").bind(fingerprint).first();
+      const current=existingReview||duplicate;
+      let automatic=null;
+      const hasMissingDate=!current||!current.published_at||!current.application_last_date;
+      if(hasMissingDate&&dateCheckIsDue(current?.date_checked_at)&&dateBudget.used<dateBudget.max){
+        dateBudget.used++;
+        dateChecks++;
+        automatic=await extractOfficialNoticeDates(env,item.link);
+      }
+      const publishedAt=item.publishedAt||automatic?.publishedAt||null;
+      const applicationLastDate=item.applicationLastDate||automatic?.applicationLastDate||null;
+      const checkedAt=automatic?.checkedAt||(item.publishedAt||item.applicationLastDate?new Date().toISOString():null);
+      const evidence=automatic?.evidence||(item.publishedAt||item.applicationLastDate?"Date read from the official listing page.":null);
 
-      const fingerprint = ("official-page|" + item.link + "|" + item.title).slice(0,900);
-      const duplicate = await db.prepare("SELECT id,published_at,application_last_date FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
-      if (duplicate) {
-        if((item.publishedAt&&!duplicate.published_at)||(item.applicationLastDate&&!duplicate.application_last_date)){
-          await db.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
-            .bind(item.publishedAt||null,item.applicationLastDate||null,duplicate.id).run();
-        }
-        skipped++;
-        continue;
+      if(duplicate){
+        await db.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?),date_checked_at=COALESCE(?,date_checked_at),date_evidence=COALESCE(?,date_evidence) WHERE id=?")
+          .bind(publishedAt,applicationLastDate,checkedAt,evidence,duplicate.id).run();
       }
-      const existingReview=await db.prepare("SELECT id FROM review_items WHERE fingerprint=? AND status='pending'").bind(fingerprint).first();
       if(existingReview){
-        await db.prepare("UPDATE review_items SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
-          .bind(item.publishedAt||null,item.applicationLastDate||null,existingReview.id).run();
+        await db.prepare("UPDATE review_items SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?),date_checked_at=COALESCE(?,date_checked_at),date_evidence=COALESCE(?,date_evidence) WHERE id=?")
+          .bind(publishedAt,applicationLastDate,checkedAt,evidence,existingReview.id).run();
         skipped++;
         continue;
       }
+      if(duplicate){
+        skipped++;
+        continue;
+      }
+
       const write=await db.prepare(`
         INSERT OR IGNORE INTO review_items
-        (fingerprint,title,summary,category,source_name,source_url,published_at,application_last_date,status)
-        VALUES(?,?,?,?,?,?,?,?, 'pending')
+        (fingerprint,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,status)
+        VALUES(?,?,?,?,?,?,?,?,?,?, 'pending')
       `).bind(
         fingerprint,
         item.title,
         clean(item.summary||"",1200),
-        (detectCategory(item.title, item.summary||"") || monitor.category || "jobs-vacancies"),
+        (detectCategory(item.title,item.summary||"")||monitor.category||"jobs-vacancies"),
         monitor.name,
         item.link,
-        item.publishedAt||null,
-        item.applicationLastDate||null
+        publishedAt,
+        applicationLastDate,
+        checkedAt,
+        evidence
       ).run();
-
       if(write.meta?.changes)inserted++;
       else skipped++;
     }
   }
-
-  return {
-    checked:OFFICIAL_MONITORS.length,
-    inserted,
-    skipped,
-    errors
-  };
+  return {checked:OFFICIAL_MONITORS.length,inserted,skipped,date_checks:dateChecks,errors};
 }
 
 /* MAIN SYNC SYSTEM */
 
 async function syncAll(env){
-  const sources=await env.DB.prepare(
-    "SELECT * FROM sources WHERE active=1"
-  ).all();
-
+  const sources=await env.DB.prepare("SELECT * FROM sources WHERE active=1").all();
   let rssInserted=0;
   let rssSkipped=0;
   const errors=[];
+  const dateBudget={used:0,max:8};
 
-  // 1. RSS feeds sync concurrently: a slow publisher does not block other sources.
+  // RSS feeds: enrich missing dates from the official item page/PDF, within a small per-sync budget.
   await Promise.all((sources.results||[]).map(async source=>{
     try{
       const entries=await fetchFeed(source,env);
       for(const item of entries){
         const guid=(source.feed_url+"|"+item.guid).slice(0,900);
-        const deadline=parseApplicationDeadline(item.summary);
-        const duplicate=await env.DB.prepare("SELECT id,summary,published_at,application_last_date FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+        const summaryDeadline=parseApplicationDeadline(item.summary);
+        const duplicate=await env.DB.prepare("SELECT id,summary,published_at,application_last_date,date_checked_at,date_evidence FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+        let automatic=null;
+        const missingDate=!item.publishedAt||!summaryDeadline;
+        if(missingDate&&dateBudget.used<dateBudget.max&&(!duplicate||dateCheckIsDue(duplicate.date_checked_at))){
+          dateBudget.used++;
+          automatic=await extractOfficialNoticeDates(env,item.link);
+        }
+        const publishedAt=item.publishedAt||automatic?.publishedAt||null;
+        const applicationLastDate=summaryDeadline||automatic?.applicationLastDate||null;
+        const checkedAt=automatic?.checkedAt||null;
+        const evidence=automatic?.evidence||(summaryDeadline?"Application deadline found in the official RSS description.":null);
+
         if(duplicate){
           const incomingSummary=String(item.summary||"").trim();
           const storedSummary=String(duplicate.summary||"").trim();
-          // Enrich duplicates only with longer official content and verified dates.
-          if(incomingSummary.length>storedSummary.length||(item.publishedAt&&!duplicate.published_at)||(deadline&&!duplicate.application_last_date)){
-            await env.DB.prepare("UPDATE posts SET summary=CASE WHEN length(?)>length(summary) THEN ? ELSE summary END,published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
-              .bind(incomingSummary,incomingSummary,item.publishedAt||null,deadline,duplicate.id).run();
+          if(incomingSummary.length>storedSummary.length||(!duplicate.published_at&&publishedAt)||(!duplicate.application_last_date&&applicationLastDate)||checkedAt){
+            await env.DB.prepare("UPDATE posts SET summary=CASE WHEN length(?)>length(summary) THEN ? ELSE summary END,published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?),date_checked_at=COALESCE(?,date_checked_at),date_evidence=COALESCE(?,date_evidence) WHERE id=?")
+              .bind(incomingSummary,incomingSummary,publishedAt,applicationLastDate,checkedAt,evidence,duplicate.id).run();
           }
           rssSkipped++;
           continue;
         }
         const result=await env.DB.prepare(`
           INSERT OR IGNORE INTO posts
-          (guid,title,summary,category,source_name,source_url,published_at,application_last_date,status,ai_extraction_status)
-          VALUES(?,?,?,?,?,?,?,?,'published','pending')
-        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary) || (CATEGORY_SET.has(source.category) ? source.category : "jobs-vacancies")),source.name,item.link,item.publishedAt,deadline).run();
+          (guid,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,status,ai_extraction_status)
+          VALUES(?,?,?,?,?,?,?,?,?,?,'published','pending')
+        `).bind(
+          guid,item.title,item.summary,
+          (detectCategory(item.title,item.summary)||(CATEGORY_SET.has(source.category)?source.category:"jobs-vacancies")),
+          source.name,item.link,publishedAt,applicationLastDate,checkedAt,evidence
+        ).run();
         if(result.meta?.changes)rssInserted++;else rssSkipped++;
       }
       await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
@@ -740,44 +756,26 @@ async function syncAll(env){
     }
   }));
 
-  // 2. Official website monitoring
-  let officialResult={
-    checked:0,
-    inserted:0,
-    skipped:0,
-    errors:[]
-  };
-
+  let officialResult={checked:0,inserted:0,skipped:0,date_checks:0,errors:[]};
   try{
-    officialResult=await syncOfficialMonitors(env.DB);
+    officialResult=await syncOfficialMonitors(env.DB,env,dateBudget);
     errors.push(...officialResult.errors);
   }catch(e){
     errors.push("Official monitoring: "+clean(e.message,180));
   }
 
-  const pendingCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM review_items WHERE status='pending'").first();
-
+  const pendingCount=await env.DB.prepare("SELECT COUNT(*) AS total FROM review_items WHERE status='pending'").first();
   return {
     sources_checked:(sources.results?.length||0)+officialResult.checked,
     review_pending:pendingCount?.total||0,
-
-    rss:{
-      inserted:rssInserted,
-      skipped:rssSkipped
-    },
-
-    official:{
-      checked:officialResult.checked,
-      inserted:officialResult.inserted,
-      skipped:officialResult.skipped
-    },
-
+    rss:{inserted:rssInserted,skipped:rssSkipped},
+    official:{checked:officialResult.checked,inserted:officialResult.inserted,skipped:officialResult.skipped},
+    date_extraction:{checked:dateBudget.used,limit:dateBudget.max,pending_next_sync:Math.max(0,officialResult.inserted+officialResult.skipped-dateBudget.used)},
     inserted:rssInserted+officialResult.inserted,
     skipped:rssSkipped+officialResult.skipped,
     errors
   };
 }
-
 
 
 /* AI NOTICE EXTRACTION ----------------------------------------------------- */
