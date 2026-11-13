@@ -16,3 +16,6 @@ crons = ["*/30 * * * *"]
 ALLOWED_ORIGIN = "https://jobs.go7.in"
 PUBLIC_SITE_URL = "https://jobs.go7.in"
 MAX_ITEMS_PER_FEED = "25"
+
+[ai]
+binding = "AI"
