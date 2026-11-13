@@ -10,6 +10,36 @@ const CATEGORIES = [
 
 const CATEGORY_SET = new Set(CATEGORIES.map(x=>x[0]));
 
+const SITE_ORIGIN = "https://jobs.go7.in";
+const SITEMAP_POST_BATCH = 45000;
+const SITEMAP_STATIC_PAGES = ["/", "/about.html", "/contact.html", "/privacy.html", "/disclaimer.html", "/terms.html"];
+
+function xmlEscape(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+
+function sitemapResponse(xml, status = 200) {
+  return new Response(xml, { status, headers: {
+    "content-type":"application/xml; charset=utf-8",
+    "cache-control":"public, max-age=300, s-maxage=300",
+    "x-content-type-options":"nosniff"
+  }});
+}
+
+function sitemapUrlNode(path, lastmod = null) {
+  let dateValue = lastmod ? String(lastmod) : "";
+  if (dateValue && !dateValue.includes("T") && dateValue.includes(" ")) dateValue = dateValue.replace(" ", "T") + "Z";
+  const parsed = dateValue ? new Date(dateValue) : null;
+  const lastmodText = parsed && Number.isFinite(parsed.getTime()) ? "<lastmod>" + parsed.toISOString() + "</lastmod>" : "";
+  return "<url><loc>" + xmlEscape(SITE_ORIGIN + path) + "</loc>" + lastmodText + "</url>";
+}
+
+function sitemapIndexNode(path) {
+  return "<sitemap><loc>" + xmlEscape(SITE_ORIGIN + path) + "</loc></sitemap>";
+}
+
 function detectCategory(title = "", summary = "") {
   const text = (String(title) + " " + String(summary)).toLowerCase().replace(/[\u2010-\u2015]/g,"-").replace(/\s+/g," ").trim();
   const rules = [
@@ -1419,6 +1449,52 @@ export default {
     const path=url.pathname;
 
     try{
+      // Dynamic sitemap endpoints run only for /sitemap* on jobs.go7.in.
+      if (request.method === "GET" && (path === "/sitemap.xml" || path === "/sitemap_index.xml")) {
+        const countRow = await env.DB.prepare("SELECT COUNT(*) AS total FROM posts WHERE status='published'").first();
+        const totalPosts = Number(countRow?.total || 0);
+        const postSitemapCount = Math.ceil(totalPosts / SITEMAP_POST_BATCH);
+        const sitemapPaths = ["/sitemap-pages.xml", "/sitemap-categories.xml"];
+        for (let page = 1; page <= postSitemapCount; page++) sitemapPaths.push("/sitemap-posts-" + page + ".xml");
+        const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+          sitemapPaths.map(sitemapIndexNode).join("") + "</sitemapindex>";
+        return sitemapResponse(xml);
+      }
+
+      if (request.method === "GET" && path === "/sitemap-pages.xml") {
+        const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+          SITEMAP_STATIC_PAGES.map(page => sitemapUrlNode(page)).join("") + "</urlset>";
+        return sitemapResponse(xml);
+      }
+
+      if (request.method === "GET" && path === "/sitemap-categories.xml") {
+        const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+          CATEGORIES.map(([category]) => sitemapUrlNode("/" + category + "/")).join("") + "</urlset>";
+        return sitemapResponse(xml);
+      }
+
+      const postSitemapPrefix = "/sitemap-posts-";
+      if (request.method === "GET" && path.startsWith(postSitemapPrefix) && path.endsWith(".xml")) {
+        const pageText = path.slice(postSitemapPrefix.length, -4);
+        const page = Number(pageText);
+        if (!Number.isSafeInteger(page) || page < 1 || String(page) !== pageText || page > 10000) return sitemapResponse("Invalid sitemap page.", 400);
+        const offset = (page - 1) * SITEMAP_POST_BATCH;
+        const rows = await env.DB.prepare(
+          "SELECT id, published_at, created_at FROM posts WHERE status='published' " +
+          "ORDER BY COALESCE(published_at, created_at) DESC, id DESC LIMIT ? OFFSET ?"
+        ).bind(SITEMAP_POST_BATCH, offset).all();
+        const posts = rows.results || [];
+        if (!posts.length) return sitemapResponse("Sitemap not found.", 404);
+        const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+          posts.map(post => sitemapUrlNode("/detail.html?id=" + encodeURIComponent(post.id), post.published_at || post.created_at)).join("") +
+          "</urlset>";
+        return sitemapResponse(xml);
+      }
+
       if(path==="/"){
         return json({ok:true,service:"GO7 Government API",health:"/api/health",categories:"/api/categories"},200,corsOrigin);
       }
