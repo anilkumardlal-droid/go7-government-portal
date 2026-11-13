@@ -553,9 +553,7 @@ body{font-size:14px}
 }
 .category-post-grid,
 .search-result-list{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
+  display:block;
   margin:0;
   padding:0;
   list-style-position:inside;
@@ -575,6 +573,10 @@ body{font-size:14px}
   content:"* ";
   color:#0000ef;
   font-size:14px;
+}
+.category-post-card + .category-post-card,
+.search-result-card + .search-result-card{
+  margin-top:8px;
 }
 .category-post-card h2,
 .search-result-card h2{
