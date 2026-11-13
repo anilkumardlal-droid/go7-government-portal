@@ -529,3 +529,14 @@ body{font-size:14px}
   text-decoration-color:blue;
   text-underline-offset:2px;
 }
+
+/* User-requested asterisk marker before each category/search post title */
+
+.category-post-card h2::before,
+.search-result-card h2::before{
+  content:"*";
+  display:inline-block;
+  margin-right:7px;
+  color:#0000ef;
+  text-decoration:none;
+}
