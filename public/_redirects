@@ -1,4 +1,16 @@
-# Root-level category pages are static files; unmatched single-segment slugs are post permalinks.
+# Individual post URLs use /detail/<slug>/; category routes stay on their own index pages.
+# Keep these category rewrites above the legacy one-segment post fallback.
+/detail/:slug/ /detail.html?slug=:slug 200
+/detail/:slug /detail.html?slug=:slug 200
 /category/:slug/ /:slug/ 301
 /category/:slug /:slug/ 301
+/latest-jobs/ /latest-jobs/index.html 200
+/results/ /results/index.html 200
+/admit-cards/ /admit-cards/index.html 200
+/answer-keys/ /answer-keys/index.html 200
+/documents/ /documents/index.html 200
+/admissions/ /admissions/index.html 200
+/iti-jobs/ /iti-jobs/index.html 200
+/outsourcing-jobs/ /outsourcing-jobs/index.html 200
+/syllabus/ /syllabus/index.html 200
 /:slug/ /detail.html?slug=:slug 200
