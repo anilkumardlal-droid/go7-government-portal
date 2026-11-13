@@ -556,7 +556,7 @@ const OFFICIAL_MONITORS = [
 ];
 
 const RECRUITMENT_RE =
-  /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam date|exam schedule|skill test|cbt)\b/i;
+  /\b(advt?\.?\s*no\.?|advertisement\s+no\.?|recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam date|exam schedule|skill test|cbt)\b/i;
 
 const IGNORE_RE =
   /\b(tender|procurement|quotation|annual report|press release|meeting|photo gallery|celebration|e[-\s]?auction)\b/i;
@@ -661,10 +661,10 @@ function extractEmploymentNewsRows(html,pageUrl,monitor){
 function extractOfficialTableRows(html,pageUrl,monitor){
   const out=[];
   const seen=new Set();
-  const rows=String(html||"").match(/<tr\\b[^>]*>[\\s\\S]*?<\\/tr>/gi)||[];
+  const rows=String(html||"").match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[];
 
   for(const row of rows){
-    const cells=[...row.matchAll(/<(td|th)\\b[^>]*>([\\s\\S]*?)<\\/\\1>/gi)]
+    const cells=[...row.matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
       .map(match=>cleanFeedContent(match[2],1200))
       .filter(Boolean);
     if(cells.length<2)continue;
@@ -674,7 +674,7 @@ function extractOfficialTableRows(html,pageUrl,monitor){
     const title=clean(cells.slice(1).join(" - "),220);
     if(!isUsefulNoticeTitle(title)||!RECRUITMENT_RE.test(title))continue;
 
-    const hrefs=[...row.matchAll(/<a\\b[^>]*href\\s*=\\s*(["'])(.*?)\\1/gi)];
+    const hrefs=[...row.matchAll(/<a\b[^>]*href\s*=\s*(["'])(.*?)\1/gi)];
     let link="";
     for(const match of hrefs){
       try{
@@ -691,7 +691,7 @@ function extractOfficialTableRows(html,pageUrl,monitor){
     const key=link+"|"+title;
     if(seen.has(key))continue;
     seen.add(key);
-    const dateMatch=rowText.match(/\\b\\d{1,2}[\\/-]\\d{1,2}[\\/-]\\d{4}\\b/);
+    const dateMatch=rowText.match(/\b\d{1,2}[\/-]\d{1,2}[\/-]\d{4}\b/);
     out.push({
       title,
       link,
@@ -733,13 +733,15 @@ async function fetchOfficialMonitor(monitor){
         continue;
       }
 
-      const entries=monitor.parser==="employment-jobs"
-        ?extractEmploymentNewsRows(html,pageUrl,monitor)
-        :monitor.parser==="table"
-          ?(extractOfficialTableRows(html,pageUrl,monitor).length
-            ?extractOfficialTableRows(html,pageUrl,monitor)
-            :extractOfficialLinks(html,pageUrl,monitor))
-          :extractOfficialLinks(html,pageUrl,monitor);
+      let entries;
+      if(monitor.parser==="employment-jobs"){
+        entries=extractEmploymentNewsRows(html,pageUrl,monitor);
+      }else if(monitor.parser==="table"){
+        entries=extractOfficialTableRows(html,pageUrl,monitor);
+        if(!entries.length)entries=extractOfficialLinks(html,pageUrl,monitor);
+      }else{
+        entries=extractOfficialLinks(html,pageUrl,monitor);
+      }
 
 if(entries.length){
   return {
