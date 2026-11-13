@@ -439,3 +439,8 @@ body{font-size:14px}
   .brand{width:64px;height:64px;flex-basis:64px}
   .footer-brand{width:72px;height:72px;flex-basis:72px}
 }
+
+
+/* Convert the supplied transparent color logo to white only on dark surfaces */
+.footer-brand-logo{filter:brightness(0) invert(1)}
+@media(max-width:760px){.brand-logo{filter:brightness(0) invert(1)}}
