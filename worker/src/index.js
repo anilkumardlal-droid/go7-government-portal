@@ -802,8 +802,9 @@ export default {
           const host=new URL(source_url).hostname;
           if(!isOfficialHost(host)) return json({error:"Manual posts must link to an official .gov.in, .nic.in, .ac.in or .edu.in source."},400,corsOrigin);
           const guid="manual|"+crypto.randomUUID();
+          const finalCategory=detectCategory(title,summary)||category;
           const slug=await createUniqueSlug(env.DB,title);
-          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published','pending',?)").bind(guid,title,summary,category,source_name,source_url,slug).run();
+          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published','pending',?)").bind(guid,title,summary,finalCategory,source_name,source_url,slug).run();
           return json({ok:true,id:result.meta?.last_row_id,message:"Post published."},201,corsOrigin);
         }
 
