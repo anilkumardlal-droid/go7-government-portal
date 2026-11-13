@@ -337,3 +337,8 @@ button.is-loading::before{content:"";width:14px;height:14px;border:2px solid cur
   .search-form,.search-page-form{width:100%;max-width:none}
   .search-form button,.search-page-form button{padding:9px 12px}
 }
+
+/* Footer brand remains on one line: GO7 Government Updates */
+.footer-brand{flex-direction:row;align-items:center;gap:8px;white-space:nowrap}
+.footer-brand strong{display:inline-block;padding:10px;font-size:30px;font-weight:500}
+.footer-brand span{display:inline-block;font-size:13px;font-weight:500}
