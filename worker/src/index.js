@@ -889,7 +889,7 @@ function extractOfficialEducationEntries(html,pageUrl,monitor){
     return [...row.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].map(match=>{
       const label=cleanFeedContent(match[2],180);
       const href=match[1].match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
-      if(!href||/^(?:apply|apply online|click here|read more|view|download|more|login|register)$/i.test(label))return null;
+      if(!href||/^(?:apply|apply online|login|register|apply here)$/i.test(label))return null;
       try{
         const target=new URL(decode(href),pageUrl);
         if(!["http:","https:"].includes(target.protocol)||!monitor.hosts.includes(target.hostname.toLowerCase()))return null;
