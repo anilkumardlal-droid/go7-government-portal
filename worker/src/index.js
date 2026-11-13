@@ -264,7 +264,7 @@ const OFFICIAL_MONITORS = [
 ];
 
 const RECRUITMENT_RE =
-  /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam date|exam schedule|skill test|cbt)\b/i;i;
+  /\b(recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam date|exam schedule|skill test|cbt)\b/i;
 
 const IGNORE_RE =
   /\b(tender|procurement|quotation|annual report|press release|meeting|photo gallery|celebration|e[-\s]?auction)\b/i;
