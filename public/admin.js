@@ -33,8 +33,9 @@ $("sync").onclick = async () => {
     const d = await call("/api/admin/sync", "POST", {});
     say(
       `Sync completed: ${d.sources_checked || 0} sources checked, ` +
-      `${d.inserted || 0} new posts, ` +
+      `${d.inserted || 0} new items, ` +
       `${d.skipped || 0} already existing. ` +
+      `Dates auto-read from ${d.date_extraction?.checked || 0} official pages/PDFs in this run (maximum ${d.date_extraction?.limit || 8}); remaining items continue on later syncs. ` +
       `Pending official notices for review: ${d.review_pending || 0}. ` +
       `Errors: ${(d.errors || []).join(" | ") || "None"}`
     );
@@ -62,14 +63,20 @@ async function loadReview(){
       const pub=dateInputValue(item.published_at);
       const deadline=dateInputValue(item.application_last_date);
       const expired=Boolean(deadline&&deadline<indiaToday());
+      const autoStatus=item.date_checked_at
+        ?(pub||deadline?"Automatic date reading found at least one labelled date. Verify the source evidence below.":"Automatic reading finished but could not confirm a labelled date. Admin verification is required.")
+        :"Automatic page/PDF reading is waiting for a sync run.";
+      const evidence=item.date_evidence?escapeHtml(item.date_evidence):"No date evidence recorded yet.";
       return `<div class="source-row" data-review-card="${item.id}">
         <b>${escapeHtml(item.title)}</b> · ${escapeHtml(item.category)}
         <br><small>${escapeHtml(item.source_name)} · Detected by GO7: ${escapeHtml(item.detected_at||"unknown")} (this is not the notice publication date)</small>
         <br><a href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener">Open official notice</a>
+        <p><strong>Date extraction:</strong> ${escapeHtml(autoStatus)}</p>
+        <small><strong>What GO7 read:</strong> ${evidence}</small>
         ${expired?'<p><strong>APPLICATION CLOSED — archive notice</strong></p>':""}
-        <div class="field"><label>Official publication date (enter from the notice)</label><input type="date" data-published value="${pub}"></div>
-        <div class="field"><label>Application last date (if applicable)</label><input type="date" data-deadline value="${deadline}"></div>
-        <small>${expired?"The deadline has passed. Approving will publish it as a closed/archived notice.":deadline?"Application deadline is recorded.":"Check the official notice for its original publication date and deadline. Leave a date blank only when the source does not provide it."}</small>
+        <div class="field"><label>Official publication date (automatically filled when confirmed; otherwise check the notice)</label><input type="date" data-published value="${pub}"></div>
+        <div class="field"><label>Application last date (if applicable; automatically filled when confirmed)</label><input type="date" data-deadline value="${deadline}"></div>
+        <small>${expired?"The deadline has passed. Approving will publish it as a closed/archived notice.":deadline?"Application deadline is recorded; compare it with the official source.": "If a date could not be confirmed, enter it only after checking the official webpage/PDF. Leave it blank if that date does not apply."}</small>
         <br><button type="button" data-approve="${item.id}" class="primary">Approve & publish</button> <button type="button" data-dismiss="${item.id}" class="secondary">Dismiss</button>
       </div>`;
     }).join("");
