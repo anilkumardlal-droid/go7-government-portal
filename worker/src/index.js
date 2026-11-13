@@ -482,8 +482,22 @@ async function syncOfficialMonitors(db){
       const guid=("official-page|"+item.link).slice(0,900);
 
       const fingerprint = ("official-page|" + item.link + "|" + item.title).slice(0,900);
-      const duplicate = await db.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
-      if (duplicate) { skipped++; continue; }
+      const duplicate = await db.prepare("SELECT id,published_at,application_last_date FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+      if (duplicate) {
+        if((item.publishedAt&&!duplicate.published_at)||(item.applicationLastDate&&!duplicate.application_last_date)){
+          await db.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
+            .bind(item.publishedAt||null,item.applicationLastDate||null,duplicate.id).run();
+        }
+        skipped++;
+        continue;
+      }
+      const existingReview=await db.prepare("SELECT id FROM review_items WHERE fingerprint=? AND status='pending'").bind(fingerprint).first();
+      if(existingReview){
+        await db.prepare("UPDATE review_items SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
+          .bind(item.publishedAt||null,item.applicationLastDate||null,existingReview.id).run();
+        skipped++;
+        continue;
+      }
       const write=await db.prepare(`
         INSERT OR IGNORE INTO review_items
         (fingerprint,title,summary,category,source_name,source_url,published_at,application_last_date,status)
