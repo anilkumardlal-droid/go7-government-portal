@@ -947,7 +947,7 @@ export default {
       if(slugMatch&&request.method==="GET"){
         const slug=slugMatch[1];
         let post=await env.DB.prepare(
-          "SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE slug=? AND status='published'"
+          "SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE slug=? AND status='published'"
         ).bind(slug).first();
         if(!post){
           const candidates=await env.DB.prepare("SELECT id,title,slug FROM posts WHERE status='published'").all();
@@ -1128,7 +1128,7 @@ export default {
 
         if(path==="/api/admin/review"&&request.method==="GET"){
           const rows=await env.DB.prepare(
-            "SELECT id,title,category,source_name,source_url,published_at,application_last_date,detected_at FROM review_items WHERE status='pending' ORDER BY detected_at DESC LIMIT 100"
+            "SELECT id,title,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,detected_at FROM review_items WHERE status='pending' ORDER BY detected_at DESC LIMIT 100"
           ).all();
           return json({items:rows.results||[]},200,corsOrigin);
         }
@@ -1152,14 +1152,14 @@ export default {
             const applicationLastDate=rawDeadline?parseOfficialDate(rawDeadline):(item.application_last_date||null);
             if(rawPublished&&!publishedAt)return json({error:"Enter a valid official publication date (DD/MM/YYYY or YYYY-MM-DD)."},400,corsOrigin);
             if(rawDeadline&&!applicationLastDate)return json({error:"Enter a valid application last date (DD/MM/YYYY or YYYY-MM-DD)."},400,corsOrigin);
-            const duplicate=await env.DB.prepare("SELECT id,published_at,application_last_date FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+            const duplicate=await env.DB.prepare("SELECT id,published_at,application_last_date,date_checked_at,date_evidence FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
             if(!duplicate){
               const slug=await createUniqueSlug(env.DB,item.title);
-              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,application_last_date,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,?,?, 'published','pending',?)`)
-                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "jobs-vacancies"),item.source_name,item.source_url,publishedAt,applicationLastDate,slug).run();
-            }else if((publishedAt&&!duplicate.published_at)||(applicationLastDate&&!duplicate.application_last_date)){
-              await env.DB.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
-                .bind(publishedAt,applicationLastDate,duplicate.id).run();
+              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,date_evidence,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,?,?,?,?, 'published','pending',?)`)
+                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "jobs-vacancies"),item.source_name,item.source_url,publishedAt,applicationLastDate,item.date_checked_at||null,item.date_evidence||null,slug).run();
+            }else if((publishedAt&&!duplicate.published_at)||(applicationLastDate&&!duplicate.application_last_date)||(item.date_checked_at&&!duplicate.date_checked_at)){
+              await env.DB.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?),date_checked_at=COALESCE(date_checked_at,?),date_evidence=COALESCE(date_evidence,?) WHERE id=?")
+                .bind(publishedAt,applicationLastDate,item.date_checked_at||null,item.date_evidence||null,duplicate.id).run();
             }
             await env.DB.prepare("UPDATE review_items SET status='approved',published_at=COALESCE(?,published_at),application_last_date=COALESCE(?,application_last_date) WHERE id=?")
               .bind(publishedAt,applicationLastDate,id).run();
