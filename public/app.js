@@ -16,7 +16,7 @@
       const r=await fetch(url,{cache:"no-store"});
       if(!r.ok)throw new Error("Updates service returned "+r.status);
       const data=await r.json(),posts=data.posts||[];
-      target.innerHTML=posts.length?posts.map(p=>'<a class="post-link feed-link" href="'+postHref(p)+'">'+newBadge(p)+closedBadge(p)+esc(p.title||"Government Update")+'</a>').join(""):'<p class="empty-panel">No updates published in this category yet.</p>';
+      target.innerHTML=posts.length?posts.map(p=>'<a class="post-link feed-link" href="'+postHref(p)+'"><span class="post-list-marker" aria-hidden="true">*</span>'+newBadge(p)+closedBadge(p)+'<span class="home-post-title">'+esc(p.title||"Government Update")+'</span></a>').join(""):'<p class="empty-panel">No updates published in this category yet.</p>';
     }catch(e){
       console.error("GO7 category load:",cat,e);
       target.innerHTML='<p class="empty-panel">Updates are temporarily unavailable. Please refresh.</p>';
