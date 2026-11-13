@@ -33,7 +33,7 @@ Do not deploy until the local Pages preview and API checks pass.
    `npx.cmd wrangler d1 migrations apply go7-gov-db --remote`
 3. Deploy the Worker:
    `npx.cmd wrangler deploy`
-4. Deploy only the `public/` directory to the existing Pages project `go7-government-portal` / `go7-government-portal` configured project name as listed in Cloudflare.
+4. Deploy only the `public/` directory to the existing Pages project `go7-government-portal` as listed in Cloudflare.
 5. Verify homepage category cards, category paths, slug details, old category redirects, admin login and scheduled feed sync.
 
 The migration adds a nullable slug field and index; it does not delete, reset or replace existing posts. Keep `ADMIN_TOKEN` in Cloudflare Worker secrets; never add it to this repository or ZIP.
