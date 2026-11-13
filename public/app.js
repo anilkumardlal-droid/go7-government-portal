@@ -4,7 +4,7 @@
   const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const dateLabel=value=>{if(!value)return "Recently added";const d=new Date(value);return Number.isNaN(d.getTime())?"Recently added":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});};
   const postHref=post=>post.id?"/detail.html?id="+encodeURIComponent(post.id):"#";
-  const isNewPost=post=>{const value=post?.created_at||post?.published_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
+  const isNewPost=post=>{const value=post?.published_at||post?.created_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
   const newBadge=post=>isNewPost(post)?'<span class="new-post-badge" aria-label="New post">NEW</span> ':"";
   async function loadCategory(panel){
     const cat=panel.dataset.category,target=panel.querySelector(".panel-body"),refresh=panel.querySelector(".panel-refresh");
