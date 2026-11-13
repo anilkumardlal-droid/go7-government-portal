@@ -22,11 +22,13 @@ $("add").onclick=async()=>{
 };
 
 $("sync").onclick = async () => {
+  const button=$("sync");
+  button.disabled=true;
+  button.classList.add("is-loading");
+  button.textContent="Syncing RSS feeds…";
   try {
-    say("Syncing RSS feeds…");
-
+    say("Checking configured RSS feeds and official notices…");
     const d = await call("/api/admin/sync", "POST", {});
-
     say(
       `Sync completed: ${d.sources_checked || 0} sources checked, ` +
       `${d.inserted || 0} new posts, ` +
@@ -34,9 +36,12 @@ $("sync").onclick = async () => {
       `Pending official notices for review: ${d.review_pending || 0}. ` +
       `Errors: ${(d.errors || []).join(" | ") || "None"}`
     );
-
   } catch (e) {
     say("Sync failed: " + e.message);
+  } finally {
+    button.disabled=false;
+    button.classList.remove("is-loading");
+    button.textContent="Sync RSS feeds";
   }
 };
 
@@ -72,7 +77,6 @@ $("review").addEventListener("click",async event=>{
 $("publishPost").onclick=async()=>{try{say("Publishing verified update…");const d=await call("/api/admin/posts","POST",{title:$("postTitle").value.trim(),summary:$("postSummary").value.trim(),category:$("postCategory").value,source_name:$("postSource").value.trim(),source_url:$("postUrl").value.trim()});say(d.message||"Published.");$("postTitle").value="";$("postSummary").value="";$("postUrl").value="";}catch(e){say(e.message);}};
 
 $("loadHealth").onclick=async()=>{try{const d=await call("/api/admin/health");const rows=d.sources||[];$("health").innerHTML=rows.map(x=>`<div class="source-row"><b>${escapeHtml(x.source_name)}</b> · <strong>${escapeHtml(x.status)}</strong><br><small>Checked: ${escapeHtml(x.last_checked_at||"-")} · Last success: ${escapeHtml(x.last_success_at||"-")}</small>${x.last_error?`<br><span style="color:#b5121b">${escapeHtml(x.last_error)}</span>`:""}</div>`).join("")||"No source checks recorded yet. Run Sync RSS feeds first.";}catch(e){say(e.message);}};
-
 
 // Browser-side PDF parsing keeps large PDF processing out of the Worker CPU budget.
 const aiLoadButton = $("loadAiPosts");

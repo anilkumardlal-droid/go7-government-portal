@@ -1,0 +1,65 @@
+name: Package GO7 recovery build
+
+on:
+  push:
+    branches:
+      - go7-recovery-work-20261113
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate JavaScript and XML
+        run: |
+          node --check public/app.js
+          node --check public/search.js
+          node --check public/admin.js
+          node --check public/site.js
+          node --check public/category.js
+          node --check public/detail.js
+          node --check worker/src/index.js
+          python - <<'PY'
+          import pathlib, xml.etree.ElementTree as ET
+          root = pathlib.Path("public")
+          ET.parse(root / "sitemap.xml")
+          slugs = ["latest-jobs","results","admit-cards","answer-keys","documents","admissions","iti-jobs","outsourcing-jobs","syllabus"]
+          missing = [s for s in slugs if not (root / s / "index.html").is_file()]
+          assert not missing, f"Missing category pages: {missing}"
+          redirects = (root / "_redirects").read_text(encoding="utf-8")
+          assert "/:slug/ /detail.html?slug=:slug 200" in redirects
+          index = (root / "index.html").read_text(encoding="utf-8")
+          assert "latest-all" not in index
+          assert "View All" in index
+          assert index.count('class="panel-refresh"') == 9, "Every homepage category needs a refresh control"
+          assert "panel-footer" in index, "View All links should sit at the bottom-right of each category panel"
+          assert 'action="/search.html"' in index, "Homepage search must lead to the dedicated search page"
+          assert (root / "search.html").is_file() and (root / "search.js").is_file(), "Dedicated search page files are missing"
+          not_found = (root / "404.html").read_text(encoding="utf-8")
+          assert "not-found-home" not in not_found, "404 homepage button should be removed"
+          assert "search.html" in not_found, "404 search form must open the search page"
+          styles = (root / "styles.css").read_text(encoding="utf-8")
+          assert "box-shadow:none!important" in styles, "Post links must not use shadows"
+          assert ".detail-title{font-size:20px;font-weight:600" in styles, "Post title typography does not match the approved spec"
+          assert "© 2026 GO7. Independent information service." in index
+          print("HTML route, design and sitemap checks passed")
+          PY
+      - name: Assemble complete project ZIP
+        run: |
+          mkdir -p /tmp/go7-package/go7-government-portal-main
+          cp -a . /tmp/go7-package/go7-government-portal-main/
+          rm -rf /tmp/go7-package/go7-government-portal-main/.git /tmp/go7-package/go7-government-portal-main/.github
+          cd /tmp/go7-package
+          zip -qr "$GITHUB_WORKSPACE/GO7-Portal-Full-Redesign-1100px.zip" go7-government-portal-main
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GO7-Portal-Full-Redesign-1100px
+          path: GO7-Portal-Full-Redesign-1100px.zip
+          if-no-files-found: error
+          retention-days: 14

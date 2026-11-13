@@ -22,7 +22,7 @@ function detectCategory(title = "", summary = "") {
   for (const [category, pattern] of rules) if (pattern.test(text)) return category;
   const jobTerms = /\b(recruitment|vacanc(?:y|ies)|apprentice|appointment|hiring|apply online|posts?|jobs?|filling up|walk[- ]?in|engagement|career|applications invited|deputation basis|contract basis|employment notice|employment notification)\b/i;
   if (jobTerms.test(text)) return "latest-jobs";
-  return "latest-jobs";
+  return null;
 }
 
 function isOfficialHost(hostname) {
@@ -372,7 +372,7 @@ async function syncOfficialMonitors(db){
       `).bind(
         fingerprint,
         item.title,
-        detectCategory(item.title, ""),
+        (detectCategory(item.title, "") || "latest-jobs"),
         monitor.name,
         item.link
       ).run();
@@ -413,7 +413,7 @@ async function syncAll(env){
           INSERT OR IGNORE INTO posts
           (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status)
           VALUES(?,?,?,?,?,?,?,'published','pending')
-        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary)==="latest-jobs" && CATEGORY_SET.has(source.category) ? source.category : detectCategory(item.title,item.summary)),source.name,item.link,item.publishedAt).run();
+        `).bind(guid,item.title,item.summary,(detectCategory(item.title,item.summary) || (CATEGORY_SET.has(source.category) ? source.category : "latest-jobs")),source.name,item.link,item.publishedAt).run();
         if(result.meta?.changes)rssInserted++;else rssSkipped++;
       }
       await env.DB.prepare("UPDATE sources SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?").bind(source.id).run();
@@ -562,13 +562,40 @@ ${notice.text.slice(0, 24000)}`;
 }
 
 
+
+/* Stable, readable post slugs. Existing rows are filled lazily without deleting or rewriting content. */
+function slugify(title = "") {
+  return String(title).normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "").slice(0, 90).replace(/-+$/g, "");
+}
+async function createUniqueSlug(db, title) {
+  const base = slugify(title) || "government-update";
+  let slug = base, suffix = 2;
+  while (await db.prepare("SELECT id FROM posts WHERE slug=? LIMIT 1").bind(slug).first()) {
+    slug = `${base}-${suffix++}`;
+  }
+  return slug;
+}
+async function ensurePostSlugs(db, posts) {
+  for (const post of posts) {
+    if (post.slug) continue;
+    let slug = await createUniqueSlug(db, post.title);
+    await db.prepare("UPDATE posts SET slug=? WHERE id=? AND (slug IS NULL OR slug='')")
+      .bind(slug, post.id).run();
+    post.slug = slug;
+  }
+  return posts;
+}
+
 /* WORKER API */
 
 export default {
   async fetch(request,env,ctx){
     const origin=request.headers.get("Origin")||"";
     const allowed=env.ALLOWED_ORIGIN||"https://jobs.go7.in";
-    const corsOrigin=origin===allowed?allowed:allowed;
+    const localPreview=/^http:\/\/(localhost|127\.0\.0\.1):8080$/.test(origin);
+    const corsOrigin=(origin===allowed||localPreview)?origin:allowed;
 
     if(request.method==="OPTIONS"){
       return new Response(null,{
@@ -601,6 +628,27 @@ export default {
         return json({
           categories:CATEGORIES.map(([id,label])=>({id,label}))
         },200,corsOrigin);
+      }
+
+      const slugMatch=path.match(/^\/api\/posts\/slug\/([a-z0-9-]+)$/);
+      if(slugMatch&&request.method==="GET"){
+        const slug=slugMatch[1];
+        let post=await env.DB.prepare(
+          "SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE slug=? AND status='published'"
+        ).bind(slug).first();
+        if(!post){
+          const candidates=await env.DB.prepare("SELECT id,title,slug FROM posts WHERE status='published'").all();
+          const match=(candidates.results||[]).find(row=>slugify(row.title)===slug&&!row.slug);
+          if(match){
+            await ensurePostSlugs(env.DB,[match]);
+            post=await env.DB.prepare("SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'").bind(match.id).first();
+          }
+        }
+        if(!post)return json({error:"Post not found"},404,corsOrigin);
+        const labelMap=Object.fromEntries(CATEGORIES);
+        let aiDetails=null; try{aiDetails=post.ai_details_json?JSON.parse(post.ai_details_json):null;}catch{}
+        delete post.ai_details_json;
+        return json({post:{...post,ai_details:aiDetails,category_label:labelMap[post.category]||post.category}},200,corsOrigin);
       }
 
       const detailMatch=path.match(/^\/api\/posts\/(\d+)$/);
@@ -651,16 +699,17 @@ export default {
         ).bind(...params).first();
 
         const rows=await env.DB.prepare(`
-          SELECT id,title,summary,category,source_name,source_url,published_at,created_at
+          SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug
           FROM posts WHERE ${where}
           ORDER BY COALESCE(published_at,created_at) DESC
           LIMIT ? OFFSET ?
         `).bind(...params,limit,offset).all();
 
         const labelMap=Object.fromEntries(CATEGORIES);
+        const posts=await ensurePostSlugs(env.DB,rows.results||[]);
 
         return json({
-          posts:(rows.results||[]).map(p=>({
+          posts:posts.map(p=>({
             ...p,
             category_label:labelMap[p.category]||p.category
           })),
@@ -753,7 +802,9 @@ export default {
           const host=new URL(source_url).hostname;
           if(!isOfficialHost(host)) return json({error:"Manual posts must link to an official .gov.in, .nic.in, .ac.in or .edu.in source."},400,corsOrigin);
           const guid="manual|"+crypto.randomUUID();
-          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published','pending')").bind(guid,title,summary,category,source_name,source_url).run();
+          const finalCategory=detectCategory(title,summary)||category;
+          const slug=await createUniqueSlug(env.DB,title);
+          const result=await env.DB.prepare("INSERT INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'published','pending',?)").bind(guid,title,summary,finalCategory,source_name,source_url,slug).run();
           return json({ok:true,id:result.meta?.last_row_id,message:"Post published."},201,corsOrigin);
         }
 
@@ -778,8 +829,9 @@ export default {
             if(!isOfficialHost(host)||!isUsefulNoticeTitle(item.title)) return json({error:"Notice title or source link failed the official-source checks."},400,corsOrigin);
             const duplicate=await env.DB.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
             if(!duplicate){
-              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status) VALUES(?,?,?, ?,?,?,NULL,'published','pending')`)
-                .bind(item.fingerprint,item.title,item.summary||"",detectCategory(item.title,item.summary||""),item.source_name,item.source_url).run();
+              const slug=await createUniqueSlug(env.DB,item.title);
+              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?, ?,?,?,NULL,'published','pending',?)`)
+                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "latest-jobs"),item.source_name,item.source_url,slug).run();
             }
             await env.DB.prepare("UPDATE review_items SET status='approved' WHERE id=?").bind(id).run();
             return json({ok:true,message:duplicate?"Duplicate notice skipped; review item closed.":"Official notice approved and published."},200,corsOrigin);
@@ -800,7 +852,7 @@ export default {
           let changed=0;
 
           for(const post of rows.results||[]){
-            const category=detectCategory(post.title,post.summary);
+            const category=detectCategory(post.title,post.summary)||post.category;
             // Reclassification must never hide or delete an already published post.
             if(category!==post.category){
               await env.DB.prepare(
