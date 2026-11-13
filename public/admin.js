@@ -39,6 +39,9 @@ $("sync").onclick = async () => {
       `Dates auto-read from ${d.date_extraction?.checked || 0} official pages/PDFs in this run (maximum ${d.date_extraction?.limit || 2}); remaining items continue on later syncs. ` +
       `Auto-published official notices: ${d.official?.auto_published || 0}. ` +
       `Older notices awaiting official re-check: ${d.review_pending || 0}. ` +
+      `Category-wise published posts: ${(d.category_summary || []).map(c =>
+        `${c.label}: ${c.published_this_sync || 0} new, ${c.published_total || 0} total`
+      ).join(" | ") || "Category report unavailable"}. ` +
       `Errors: ${(d.errors || []).join(" | ") || "None"}`
     );
   } catch (e) {
