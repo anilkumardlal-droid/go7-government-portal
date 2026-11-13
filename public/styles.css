@@ -109,7 +109,7 @@ button,input,select,textarea{font:inherit}
 .detail-links a{display:inline-flex;padding:9px 13px;border-radius:5px;background:var(--navy);color:#fff;text-decoration:none;font-size:11px;font-weight:700}
 .detail-links a.official-link{background:var(--red)}
 .site-footer{width:min(calc(100% - 32px),var(--max-width));margin:0 auto 12px;background:#171a20;border-radius:0;color:#fff}
-.footer-inner{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:18px 0}
+.footer-inner{width:100%;max-width:none;margin:0;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:18px 0}
 .footer-brand{display:flex;flex-direction:column;color:#fff;text-decoration:none;line-height:1.2}
 .footer-brand strong{font-size:21px;letter-spacing:-.6px}
 .footer-brand span{color:#bfc9d7;font-size:8px;letter-spacing:1px}
