@@ -86,8 +86,8 @@ if (aiLoadButton) {
     try {
       const d = await call("/api/admin/ai/pending");
       const items = d.items || [];
-      $("aiPosts").innerHTML = items.map(item => `<div class="source-row"><b>#${item.id} · ${escapeHtml(item.title)}</b><br><small>${escapeHtml(item.source_name || "")} · ${escapeHtml(item.ai_extraction_status || "pending")}</small><br><button type="button" class="secondary" data-ai-select="${item.id}">Select this post</button></div>`).join("") || "No published Latest Jobs posts found.";
-      say(`Loaded ${items.length} Latest Jobs posts.`);
+      $("aiPosts").innerHTML = items.map(item => `<div class="source-row"><b>#${item.id} · ${escapeHtml(item.title)}</b><br><small>${escapeHtml(item.source_name || "")} · ${escapeHtml(item.ai_extraction_status || "pending")}</small><br><button type="button" class="secondary" data-ai-select="${item.id}">Select this post</button></div>`).join("") || "No published Jobs & Vacancies posts found.";
+      say(`Loaded ${items.length} Jobs & Vacancies posts.`);
     } catch (e) { say("Could not load AI posts: " + e.message); }
   };
   $("aiPosts").addEventListener("click", event => {
