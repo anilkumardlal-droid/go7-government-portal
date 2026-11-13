@@ -6,6 +6,7 @@ on:
       - go7-recovery-work-20261113
       - go7-final-deploy-20261113
       - fix-post-detail-full-content-20261113
+      - fix-content-excerpts-20261113
       - main
   workflow_dispatch:
 
@@ -42,6 +43,8 @@ jobs:
           assert '"/detail/"+encodeURIComponent(p.slug)+"/"' in (root / "category.js").read_text(encoding="utf-8")
           assert '"/detail/"+encodeURIComponent(post.slug)+"/"' in (root / "search.js").read_text(encoding="utf-8")
           assert "cleanFeedContent" in pathlib.Path("worker/src/index.js").read_text(encoding="utf-8")
+          assert "const excerpt=value=>" in (root / "category.js").read_text(encoding="utf-8")
+          assert "const excerpt=value=>" in (root / "search.js").read_text(encoding="utf-8")
           index = (root / "index.html").read_text(encoding="utf-8")
           assert "latest-all" not in index
           assert "View All" in index
