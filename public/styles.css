@@ -540,3 +540,65 @@ body{font-size:14px}
   color:#0000ef;
   text-decoration:none;
 }
+
+
+/* User-requested list marker beside title and white listing sections */
+.category-list-section,
+.search-page-results{
+  margin-bottom:14px;
+  padding:18px 20px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:9px;
+}
+.category-post-grid,
+.search-result-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin:0;
+  padding:0;
+  list-style-position:inside;
+}
+.category-post-card,
+.search-result-card{
+  display:list-item;
+  min-width:0;
+  padding:9px 12px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:7px;
+  list-style-type:disc;
+}
+.category-post-card::marker,
+.search-result-card::marker{
+  content:"* ";
+  color:#0000ef;
+  font-size:14px;
+}
+.category-post-card h2,
+.search-result-card h2{
+  display:inline;
+  margin:0;
+  font-size:14px;
+  font-weight:500;
+  line-height:1.5;
+}
+.category-post-card h2::before,
+.search-result-card h2::before{
+  content:none;
+}
+.category-post-card h2 a,
+.search-result-card h2 a{
+  display:inline;
+  color:#0000ef;
+  text-decoration-line:underline;
+  text-decoration-color:blue;
+  text-underline-offset:2px;
+  overflow-wrap:anywhere;
+}
+.category-post-card h2 a:hover,
+.search-result-card h2 a:hover{
+  color:#0000ef;
+  text-decoration-color:blue;
+}
