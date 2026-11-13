@@ -536,6 +536,12 @@ const OFFICIAL_MONITORS = [
     hosts:["csbc.bihar.gov.in","www.csbc.bihar.gov.in"]
   },
   {
+    name:"Jharkhand State Recruitment Portal",
+    category:"jobs-vacancies",
+    urls:["https://recruitment.jharkhand.gov.in/"],
+    hosts:["recruitment.jharkhand.gov.in"]
+  },
+  {
     name:"Jharkhand JPSC Recruitment",
     category:"jobs-vacancies",
     urls:["https://jpsc.gov.in/","https://jpsc.gov.in/circular_notices.php"],
@@ -579,7 +585,7 @@ const OFFICIAL_MONITORS = [
     name:"Odisha OSSSC Recruitment",
     category:"jobs-vacancies",
     parser:"table",
-    urls:["https://osssc.gov.in/Public/OSSSC/Default.aspx"],
+    urls:["https://osssc.gov.in/Public/Pages/Advertisements.aspx","https://osssc.gov.in/Public/Pages/Notification.aspx","https://osssc.gov.in/Public/OSSSC/Default.aspx"],
     hosts:["osssc.gov.in","www.osssc.gov.in"]
   },
   {
