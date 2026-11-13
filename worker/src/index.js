@@ -713,18 +713,21 @@ async function syncAll(env){
       const entries=await fetchFeed(source,env);
       for(const item of entries){
         const guid=(source.feed_url+"|"+item.guid).slice(0,900);
-        const summaryDeadline=parseApplicationDeadline(item.summary);
+        const summaryDates=extractNoticeDatesFromText(item.summary);
+        const summaryDeadline=parseApplicationDeadline(item.summary)||summaryDates.applicationLastDate;
+        const feedPublishedAt=item.publishedAt||summaryDates.publishedAt||null;
         const duplicate=await env.DB.prepare("SELECT id,summary,published_at,application_last_date,date_checked_at,date_evidence FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
         let automatic=null;
-        const missingDate=!item.publishedAt||!summaryDeadline;
+        const missingDate=!feedPublishedAt||!summaryDeadline;
         if(missingDate&&dateBudget.used<dateBudget.max&&(!duplicate||dateCheckIsDue(duplicate.date_checked_at))){
           dateBudget.used++;
           automatic=await extractOfficialNoticeDates(env,item.link);
         }
-        const publishedAt=item.publishedAt||automatic?.publishedAt||null;
+        const publishedAt=feedPublishedAt||automatic?.publishedAt||null;
         const applicationLastDate=summaryDeadline||automatic?.applicationLastDate||null;
-        const checkedAt=automatic?.checkedAt||null;
-        const evidence=automatic?.evidence||(summaryDeadline?"Application deadline found in the official RSS description.":null);
+        const checkedAt=automatic?.checkedAt||((summaryDates.publishedAt||summaryDates.applicationLastDate)?new Date().toISOString():null);
+        const summaryHasEvidence=!summaryDates.evidence.startsWith("No clearly labelled");
+        const evidence=automatic?.evidence||(summaryHasEvidence?summaryDates.evidence:null);
 
         if(duplicate){
           const incomingSummary=String(item.summary||"").trim();
