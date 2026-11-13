@@ -50,7 +50,7 @@ function isConcreteGovtNotice(title, summary = "") {
   if (GENERIC_NAV_TITLE_RE.test(t)) return false;
   if (/\b(?:user instructions?|view advertisement|new advertisement policy|web advertisement|recruitment rules?)\b/i.test(t)) return false;
 
-  const concrete = /\b(?:advt?\.?\s*(?:no\.?|number)?|advertisement\s+(?:no\.?|number|for)|notification\s+(?:no\.?|number|for|regarding)|recruitment\s+(?:notification|of|to|for)|applications?\s+(?:are\s+)?invited|inviting\s+(?:online\s+)?applications?|apply\s+online|vacanc(?:y|ies)|posts?\s+of|post\s+of|CEN[-\s/]?\d|selection\s+list|merit\s+list|short[-\s]?listed|result\s+of|admit\s+card\s+for|hall\s+ticket\s+for|answer\s+keys?\s+(?:for|of)|response\s+sheet\s+for|exam(?:ination)?\s+(?:date|schedule|notification|notice)|call\s+letter\s+for|corrigendum\s+to|extension\s+of\s+(?:the\s+)?(?:last\s+date|application|date)|postpon(?:ed|ement)|reschedul(?:ed|ing)|provisional\s+result|final\s+result)\b/i;
+  const concrete = /\b(?:advt?\.?\s*(?:no\.?|number)?|advertisement\s+(?:no\.?|number|for)|notification\s+(?:no\.?|number|for|regarding)|recruitment\s+(?:notification|of|to|for)|applications?\s+(?:are\s+)?invited|inviting\s+(?:online\s+)?applications?|apply\s+online|vacanc(?:y|ies)|posts?\s+of|post\s+of|CEN[-\s/]?\d|selection\s+list|merit\s+list|short[-\s]?listed|result\s+of|admit\s+card\s+for|hall\s+ticket\s+for|answer\s+keys?\s+(?:for|of)|response\s+sheet\s+for|exam(?:ination)?\s+(?:date|schedule|notification|notice)|call\s+letter\s+for|corrigendum\s+to|extension\s+of\s+(?:time\s+for\s+receipt\s+of\s+)?(?:the\s+)?(?:last\s+date|applications?|application|date)|postpon(?:ed|ement)|reschedul(?:ed|ing)|provisional\s+result|final\s+result)\b/i;
   if (concrete.test(t)) return true;
 
   // Some State PSC portals list a named examination plus an advertisement number.
@@ -59,7 +59,10 @@ function isConcreteGovtNotice(title, summary = "") {
 
   const titleSignals = /\b(?:recruitment|vacanc(?:y|ies)|hiring|selection|shortlist|result|admit\s+card|hall\s+ticket|answer\s+key|examination|exam)\b/i;
   const detailSignals = /\b(?:advertisement|notification|application|last\s+date|apply|post|vacanc|CEN|advt|exam\s+date|result|selection)\b/i;
-  return titleSignals.test(t) && detailSignals.test(s);
+  const employmentNewsRow = /\bofficial employment news listing\b/i.test(s) &&
+    /\bissued date:/i.test(s) && /\blast date:\s*(?!not shown|n\/a|na\b)/i.test(s) &&
+    /\b(?:officer|assistant|scientist|engineer|technician|clerk|teacher|manager|constable|nurse|accountant|executive|inspector|operator)\b/i.test(t);
+  return employmentNewsRow || (titleSignals.test(t) && detailSignals.test(s));
 }
 
 const json = (data,status=200,origin="*") => new Response(JSON.stringify(data),{
@@ -732,7 +735,11 @@ function extractOfficialTableRows(html,pageUrl,monitor){
       !actionCell.test(cell.trim())&&!dateCell.test(cell.trim())&&
       !(index===0&&/^\d{1,5}$/.test(cell.trim()))
     );
-    const title=clean(titleCells.slice(0,3).join(" - "),220);
+    const cleanedTitleCells=titleCells.map(cell=>clean(
+      cell.replace(/\b(?:user instructions?|view advertisement|apply(?: online)?|read more|click here)\b/gi," "),
+      400
+    )).filter(cell=>cell&& !actionCell.test(cell.trim()));
+    const title=clean(cleanedTitleCells.slice(0,3).join(" - "),220);
     if(!RECRUITMENT_RE.test(rowText)||!isConcreteGovtNotice(title,rowText))continue;
 
     const linkCandidates=[...row.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].map(match=>{
