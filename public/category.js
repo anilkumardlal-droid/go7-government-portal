@@ -4,14 +4,7 @@
  const $=id=>document.getElementById(id);const limit=24;let offset=0,loading=false;
  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const date=s=>{if(!s)return"Recently added";const d=new Date(s);return Number.isNaN(d.getTime())?"Recently added":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});};
- const postPermalink=post=>{
-     const base=String(post.slug||post.title||"government-update").normalize("NFKD")
-       .replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ")
-       .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")
-       .slice(0,90).replace(/-+$/g,"")||"government-update";
-     return "/detail/"+encodeURIComponent(base+"-"+post.id)+"/";
-   };
- const href=p=>p.id?postPermalink(p):"/detail.html?id="+encodeURIComponent(p.id);
+ const href=p=>p.id?"/detail.html?id="+encodeURIComponent(p.id):"#";
  const isNewPost=p=>{const value=p?.created_at||p?.published_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
  const newBadge=p=>isNewPost(p)?'<span class="new-post-badge" aria-label="New post">NEW</span> ':"";
  const excerpt=value=>{const text=String(value||"").replace(/\s+/g," ").trim();return text.length>260?text.slice(0,257).trimEnd()+"…":text;};

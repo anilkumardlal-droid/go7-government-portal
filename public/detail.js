@@ -40,14 +40,9 @@
   if(!r.ok)throw Error(r.status===404?"This update could not be found.":"The update service is temporarily unavailable.");
   const data=await r.json(),p=data.post;if(!p)throw Error("Update not found.");
   document.title=(p.title||"Update Details")+" | Jobs GO7";
-  const base=String(p.slug||p.title||"government-update").normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ")
-    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")
-    .slice(0,90).replace(/-+$/g,"")||"government-update";
-  const permalink="/detail/"+encodeURIComponent(base+"-"+p.id)+"/";
+  const permalink="/detail.html?id="+encodeURIComponent(p.id);
   const canonical=document.querySelector('link[rel="canonical"]');
   if(canonical)canonical.href="https://jobs.go7.in"+permalink;
-  if(location.pathname+location.search!==permalink)history.replaceState(null,"",permalink);
   $("detailBreadcrumb").innerHTML=' › <a href="/'+esc(p.category)+'/">'+esc(p.category_label||p.category||"Updates")+'</a> › '+esc(p.title||"Details");
   $("detailCategory").textContent=p.category_label||p.category||"GO7 Update";
   $("detailTitle").textContent=p.title||"Government Update";

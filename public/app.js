@@ -3,14 +3,7 @@
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const dateLabel=value=>{if(!value)return "Recently added";const d=new Date(value);return Number.isNaN(d.getTime())?"Recently added":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});};
-  const postPermalink=post=>{
-      const base=String(post.slug||post.title||"government-update").normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ")
-        .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")
-        .slice(0,90).replace(/-+$/g,"")||"government-update";
-      return "/detail/"+encodeURIComponent(base+"-"+post.id)+"/";
-    };
-  const postHref=post=>post.id?postPermalink(post):"/detail.html?id="+encodeURIComponent(post.id);
+  const postHref=post=>post.id?"/detail.html?id="+encodeURIComponent(post.id):"#";
   const isNewPost=post=>{const value=post?.created_at||post?.published_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
   const newBadge=post=>isNewPost(post)?'<span class="new-post-badge" aria-label="New post">NEW</span> ':"";
   async function loadCategory(panel){
