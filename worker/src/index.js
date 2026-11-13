@@ -457,7 +457,7 @@ async function fetchFeed(source,env){
   return parsed.filter(item => {
     try {
       return isOfficialHost(new URL(item.link).hostname) &&
-        isConcreteGovtNotice(item.title,item.summary) &&
+        isConcreteFeedNotice(item.title,item.summary) &&
         !IGNORE_RE.test(item.title+" "+item.summary);
     } catch { return false; }
   }).slice(0, Math.max(1, Math.min(50, Number(env.MAX_ITEMS_PER_FEED) || 25)));
