@@ -126,6 +126,29 @@ function validDate(s){
   return Number.isNaN(d.getTime())?null:d.toISOString();
 }
 
+// Parses dates only when they are explicitly supplied by an official listing or admin.
+function parseOfficialDate(value){
+  const raw=clean(value,100);
+  if(!raw)return null;
+  let year,month,day;
+  let match=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(match){
+    year=Number(match[1]);month=Number(match[2]);day=Number(match[3]);
+  }else{
+    match=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+    if(match){
+      day=Number(match[1]);month=Number(match[2]);year=Number(match[3]);
+    }else{
+      const parsed=new Date(raw);
+      if(Number.isNaN(parsed.getTime()))return null;
+      year=parsed.getUTCFullYear();month=parsed.getUTCMonth()+1;day=parsed.getUTCDate();
+    }
+  }
+  const parsed=new Date(Date.UTC(year,month-1,day));
+  if(parsed.getUTCFullYear()!==year||parsed.getUTCMonth()+1!==month||parsed.getUTCDate()!==day)return null;
+  return `${String(year).padStart(4,"0")}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+}
+
 function safeHttpUrl(value){
   try{
     const u=new URL(value);
@@ -303,7 +326,7 @@ function extractOfficialLinks(html,pageUrl,monitor){
        seen.has(target.href))continue;
 
     seen.add(target.href);
-    out.push({title,link:target.href});
+    out.push({title,link:target.href,publishedAt:null,applicationLastDate:null});
 
     if(out.length>=12)break;
   }
@@ -330,11 +353,8 @@ function extractEmploymentNewsRows(html,pageUrl,monitor){
     const lastDate=cells[cells.length-1]||"";
     if(!organisation||!post||!RECRUITMENT_RE.test(rowText))continue;
 
-    const expiry=lastDate.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})\b/);
-    if(expiry){
-      const expiryTime=new Date(Number(expiry[3]),Number(expiry[2])-1,Number(expiry[1]),23,59,59).getTime();
-      if(Number.isFinite(expiryTime)&&expiryTime<Date.now())continue;
-    }
+    const publishedAt=parseOfficialDate(cells[0]);
+    const applicationLastDate=parseOfficialDate(lastDate);
 
     const title=clean(organisation+" - "+post,220);
     if(!isUsefulNoticeTitle(title))continue;
@@ -361,7 +381,8 @@ function extractEmploymentNewsRows(html,pageUrl,monitor){
       summary:clean("Issued date: "+(cells[0]||"Not shown")+
         "; appointment: "+(method||"Not shown")+
         "; last date: "+(lastDate||"Not shown")+". Official Employment News listing.",1200),
-      publishedAt:null
+      publishedAt,
+      applicationLastDate
     });
   }
   return out.slice(0,25);
@@ -458,15 +479,17 @@ async function syncOfficialMonitors(db){
       if (duplicate) { skipped++; continue; }
       const write=await db.prepare(`
         INSERT OR IGNORE INTO review_items
-        (fingerprint,title,summary,category,source_name,source_url,status)
-        VALUES(?,?,?,?,?,?, 'pending')
+        (fingerprint,title,summary,category,source_name,source_url,published_at,application_last_date,status)
+        VALUES(?,?,?,?,?,?,?,?, 'pending')
       `).bind(
         fingerprint,
         item.title,
         clean(item.summary||"",1200),
         (detectCategory(item.title, item.summary||"") || monitor.category || "jobs-vacancies"),
         monitor.name,
-        item.link
+        item.link,
+        item.publishedAt||null,
+        item.applicationLastDate||null
       ).run();
 
       if(write.meta?.changes)inserted++;
@@ -735,14 +758,14 @@ export default {
       if(slugMatch&&request.method==="GET"){
         const slug=slugMatch[1];
         let post=await env.DB.prepare(
-          "SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE slug=? AND status='published'"
+          "SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE slug=? AND status='published'"
         ).bind(slug).first();
         if(!post){
           const candidates=await env.DB.prepare("SELECT id,title,slug FROM posts WHERE status='published'").all();
           const match=(candidates.results||[]).find(row=>slugify(row.title)===slug&&!row.slug);
           if(match){
             await ensurePostSlugs(env.DB,[match]);
-            post=await env.DB.prepare("SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'").bind(match.id).first();
+            post=await env.DB.prepare("SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,created_at,slug,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'").bind(match.id).first();
           }
         }
         if(!post)return json({error:"Post not found"},404,corsOrigin);
@@ -756,7 +779,7 @@ export default {
 
       if(detailMatch&&request.method==="GET"){
         const post=await env.DB.prepare(
-          "SELECT id,title,summary,category,source_name,source_url,published_at,created_at,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'"
+          "SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,created_at,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'"
         ).bind(Number(detailMatch[1])).first();
 
         if(!post){
@@ -800,7 +823,7 @@ export default {
         ).bind(...params).first();
 
         const rows=await env.DB.prepare(`
-          SELECT id,title,summary,category,source_name,source_url,published_at,created_at,slug
+          SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,created_at,slug
           FROM posts WHERE ${where}
           ORDER BY COALESCE(published_at,created_at) DESC
           LIMIT ? OFFSET ?
@@ -911,7 +934,7 @@ export default {
 
         if(path==="/api/admin/review"&&request.method==="GET"){
           const rows=await env.DB.prepare(
-            "SELECT id,title,category,source_name,source_url,detected_at FROM review_items WHERE status='pending' ORDER BY detected_at DESC LIMIT 100"
+            "SELECT id,title,category,source_name,source_url,published_at,application_last_date,detected_at FROM review_items WHERE status='pending' ORDER BY detected_at DESC LIMIT 100"
           ).all();
           return json({items:rows.results||[]},200,corsOrigin);
         }
@@ -928,13 +951,24 @@ export default {
             let host="";
             try{host=new URL(item.source_url).hostname;}catch{}
             if(!isOfficialHost(host)||!isUsefulNoticeTitle(item.title)) return json({error:"Notice title or source link failed the official-source checks."},400,corsOrigin);
-            const duplicate=await env.DB.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+            const approvalBody=await request.json().catch(()=>({}));
+            const rawPublished=String(approvalBody.published_at||"").trim();
+            const rawDeadline=String(approvalBody.application_last_date||"").trim();
+            const publishedAt=rawPublished?parseOfficialDate(rawPublished):(item.published_at||null);
+            const applicationLastDate=rawDeadline?parseOfficialDate(rawDeadline):(item.application_last_date||null);
+            if(rawPublished&&!publishedAt)return json({error:"Enter a valid official publication date (DD/MM/YYYY or YYYY-MM-DD)."},400,corsOrigin);
+            if(rawDeadline&&!applicationLastDate)return json({error:"Enter a valid application last date (DD/MM/YYYY or YYYY-MM-DD)."},400,corsOrigin);
+            const duplicate=await env.DB.prepare("SELECT id,published_at,application_last_date FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
             if(!duplicate){
               const slug=await createUniqueSlug(env.DB,item.title);
-              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status,slug) VALUES(?,?,?, ?,?,?,NULL,'published','pending',?)`)
-                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "jobs-vacancies"),item.source_name,item.source_url,slug).run();
+              await env.DB.prepare(`INSERT OR IGNORE INTO posts (guid,title,summary,category,source_name,source_url,published_at,application_last_date,status,ai_extraction_status,slug) VALUES(?,?,?,?,?,?,?,?, 'published','pending',?)`)
+                .bind(item.fingerprint,item.title,item.summary||"",(detectCategory(item.title,item.summary||"") || item.category || "jobs-vacancies"),item.source_name,item.source_url,publishedAt,applicationLastDate,slug).run();
+            }else if((publishedAt&&!duplicate.published_at)||(applicationLastDate&&!duplicate.application_last_date)){
+              await env.DB.prepare("UPDATE posts SET published_at=COALESCE(published_at,?),application_last_date=COALESCE(application_last_date,?) WHERE id=?")
+                .bind(publishedAt,applicationLastDate,duplicate.id).run();
             }
-            await env.DB.prepare("UPDATE review_items SET status='approved' WHERE id=?").bind(id).run();
+            await env.DB.prepare("UPDATE review_items SET status='approved',published_at=COALESCE(?,published_at),application_last_date=COALESCE(?,application_last_date) WHERE id=?")
+              .bind(publishedAt,applicationLastDate,id).run();
             return json({ok:true,message:duplicate?"Duplicate notice skipped; review item closed.":"Official notice approved and published."},200,corsOrigin);
           }
           await env.DB.prepare("UPDATE review_items SET status='dismissed' WHERE id=?").bind(id).run();
