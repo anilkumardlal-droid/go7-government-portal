@@ -156,6 +156,173 @@ function parseApplicationDeadline(value){
   return match?parseOfficialDate(match[1]):null;
 }
 
+const OFFICIAL_DATE_TOKEN = String.raw`(?:\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{4}-\d{1,2}-\d{1,2}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})`;
+
+function extractOfficialNoticeDates(value){
+  const text=String(value||"").replace(/\r/g,"");
+  const rows=text.split(/\n+/).map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
+  const publication=[];
+  const deadlines=[];
+  const dateRe=new RegExp(OFFICIAL_DATE_TOKEN,"gi");
+  const pubLabel=/\b(advertisement\s+date|notification\s+date|date\s+of\s+(?:notification|issue|publication)|publication\s+date|published\s+on|issued\s+on|notice\s+date)\b/i;
+  const appLabel=/\b(last\s+date|closing\s+date|application\s+deadline|deadline\s+for\s+application|submission\s+of\s+(?:online\s+)?applications?|applications?\s+online|apply\s+(?:by|before))\b/i;
+  const reviseLabel=/\b(revis(?:ed|ion)|extend(?:ed|sion)|postpon(?:ed|ement)|reschedul(?:ed|ing)|up\s+to)\b/i;
+  const excludeApp=/\b(remittance|fee|payment|objection|challenge|counselling\s+fee)\b/i;
+
+  function collect(line,index,source){
+    const matches=[...line.matchAll(new RegExp(OFFICIAL_DATE_TOKEN,"gi"))];
+    for(const m of matches){
+      const parsed=parseOfficialDate(m[0]);
+      if(!parsed)continue;
+      const before=line.slice(Math.max(0,m.index-180),m.index);
+      const after=line.slice(m.index+m[0].length,Math.min(line.length,m.index+m[0].length+90));
+      const around=(before+" "+m[0]+" "+after).replace(/\s+/g," ").trim();
+      if(appLabel.test(around)&&!excludeApp.test(around)){
+        deadlines.push({
+          date:parsed,
+          score:(reviseLabel.test(around)?100:20)+(source==="line"?5:0),
+          index,
+          evidence:clean(line,320)
+        });
+      }
+      if(pubLabel.test(around)&&!appLabel.test(around)){
+        publication.push({
+          date:parsed,
+          score:(source==="line"?10:0),
+          index,
+          evidence:clean(line,320)
+        });
+      }
+    }
+  }
+
+  rows.forEach((line,index)=>collect(line,index,"line"));
+  // Also inspect a bounded context for cases where PDF conversion wrapped a label and date onto separate lines.
+  const normalized=text.replace(/\s+/g," ");
+  collect(normalized,rows.length,"context");
+
+  deadlines.sort((a,b)=>b.score-a.score||b.index-a.index);
+  publication.sort((a,b)=>b.score-a.score||a.index-b.index);
+  const published=publication[0]||null;
+  const deadline=deadlines[0]||null;
+  const evidence=[
+    published?"Publication date: "+published.evidence:"",
+    deadline?"Application last date: "+deadline.evidence:""
+  ].filter(Boolean).join(" | ");
+  return {
+    publishedAt:published?.date||null,
+    applicationLastDate:deadline?.date||null,
+    evidence:evidence||"No clearly labelled publication date or application deadline was confirmed in the official page/PDF. Admin verification required."
+  };
+}
+
+function officialPdfLinks(html,pageUrl){
+  const links=[];
+  const seen=new Set();
+  const anchors=String(html||"").match(/<a\b[^>]*>[\s\S]*?<\/a>/gi)||[];
+  for(const anchor of anchors){
+    const href=anchor.match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
+    if(!href)continue;
+    const label=clean(decode(anchor.replace(/<[^>]*>/g," ")),180);
+    if(!/\b(recruitment|advertisement|notification|official notice|result|answer key|response sheet|admit card|hall ticket|corrigendum|extension)\b/i.test(label))continue;
+    if(/\b(annexure|appendix|syllabus|brochure|instruction booklet)\b/i.test(label))continue;
+    try{
+      const target=new URL(decode(href),pageUrl);
+      if(!safeHttpUrl(target.href)||!isOfficialHost(target.hostname))continue;
+      if(!/\.pdf(?:$|[?#])/i.test(target.href)&&!/\.pdf\b/i.test(href))continue;
+      if(seen.has(target.href))continue;
+      seen.add(target.href);
+      links.push({url:target.href,label});
+    }catch{}
+    if(links.length>=2)break;
+  }
+  return links;
+}
+
+async function convertOfficialDocument(env,url){
+  if(!env.AI||typeof env.AI.toMarkdown!=="function")throw new Error("Cloudflare AI Markdown Conversion is not available on the AI binding.");
+  const response=await fetchWithRetry(url,{
+    method:"GET",
+    redirect:"follow",
+    headers:{
+      "Accept":"text/html,application/xhtml+xml,application/pdf,*/*;q=0.8",
+      "Accept-Language":"en-IN,en;q=0.9"
+    }
+  },2,10000);
+  if(!response.ok)throw new Error("Official notice returned HTTP "+response.status);
+  const finalUrl=response.url||url;
+  if(!safeHttpUrl(finalUrl)||!isOfficialHost(new URL(finalUrl).hostname))throw new Error("Official notice redirected outside an approved government domain.");
+  const contentLength=Number(response.headers.get("content-length")||0);
+  if(contentLength>12000000)throw new Error("Official document exceeds the 12 MB extraction limit.");
+  const type=(response.headers.get("content-type")||"").toLowerCase();
+  const pdf=/application\/pdf/i.test(type)||/\.pdf(?:$|[?#])/i.test(finalUrl);
+  let blob,name;
+  if(pdf){
+    const bytes=await response.arrayBuffer();
+    if(bytes.byteLength>12000000)throw new Error("Official PDF exceeds the 12 MB extraction limit.");
+    blob=new Blob([bytes],{type:"application/pdf"});
+    name="official-notice.pdf";
+  }else{
+    const html=await response.text();
+    if(html.length>2000000)throw new Error("Official webpage exceeds the 2 MB extraction limit.");
+    blob=new Blob([html],{type:"text/html"});
+    name="official-notice.html";
+    const converted=await env.AI.toMarkdown({name,blob},{conversionOptions:{html:{hostname:finalUrl}}});
+    const item=Array.isArray(converted)?converted[0]:converted;
+    if(!item||item.format==="error"||!item.data)throw new Error(item?.error||"Could not convert official webpage to readable text.");
+    return {text:String(item.data).slice(0,60000),html,finalUrl,isPdf:false};
+  }
+  const converted=await env.AI.toMarkdown({name,blob});
+  const item=Array.isArray(converted)?converted[0]:converted;
+  if(!item||item.format==="error"||!item.data)throw new Error(item?.error||"Could not convert official PDF to readable text.");
+  return {text:String(item.data).slice(0,60000),html:"",finalUrl,isPdf:true};
+}
+
+async function extractOfficialNoticeDates(env,url){
+  try{
+    const page=await convertOfficialDocument(env,url);
+    let extracted=extractOfficialNoticeDates(page.text);
+    let evidence=extracted.evidence;
+    let publishedAt=extracted.publishedAt;
+    let applicationLastDate=extracted.applicationLastDate;
+
+    if(!page.isPdf&&(!publishedAt||!applicationLastDate)){
+      const pdfs=officialPdfLinks(page.html,page.finalUrl);
+      for(const pdf of pdfs){
+        try{
+          const document=await convertOfficialDocument(env,pdf.url);
+          const dates=extractOfficialNoticeDates(document.text);
+          if(!publishedAt&&dates.publishedAt){publishedAt=dates.publishedAt;evidence+=" | PDF "+pdf.label+": "+dates.evidence;}
+          if(!applicationLastDate&&dates.applicationLastDate){applicationLastDate=dates.applicationLastDate;evidence+=" | PDF "+pdf.label+": "+dates.evidence;}
+          if(publishedAt&&applicationLastDate)break;
+        }catch(error){
+          evidence=clean(evidence+" | PDF read note: "+error.message,900);
+        }
+      }
+    }
+    return {
+      publishedAt,
+      applicationLastDate,
+      evidence:clean(evidence,1200),
+      checkedAt:new Date().toISOString()
+    };
+  }catch(error){
+    return {
+      publishedAt:null,
+      applicationLastDate:null,
+      evidence:"Automatic reading could not confirm dates: "+clean(error.message,300)+" Admin verification required.",
+      checkedAt:new Date().toISOString()
+    };
+  }
+}
+
+function dateCheckIsDue(value){
+  if(!value)return true;
+  const parsed=Date.parse(String(value).replace(" ","T").replace(/(Z|[+-]\d\d:\d\d)$/,"")+"Z");
+  return !Number.isFinite(parsed)||Date.now()-parsed>12*60*60*1000;
+}
+
+
 function safeHttpUrl(value){
   try{
     const u=new URL(value);
