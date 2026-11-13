@@ -4,6 +4,7 @@
  const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const nice=s=>String(s||"").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
  const date=s=>{if(!s)return"Not provided";const d=new Date(s);return Number.isNaN(d.getTime())?"Not provided":d.toLocaleString("en-IN",{timeZone:"Asia/Kolkata",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:true})+" IST";};
+ const excerpt=value=>{const text=String(value||"").replace(/\s+/g," ").trim();return text.length>220?text.slice(0,217).trimEnd()+"…":text;};
  const params=new URLSearchParams(location.search);
  const slugParam=params.get("slug");
  const pathParts=location.pathname.split("/").filter(Boolean);
@@ -32,6 +33,23 @@
    return '<section class="detail-section"><h2>'+esc(title)+'</h2><table class="detail-table">'+valid.map(([label,v])=>'<tr><th>'+esc(label)+'</th><td>'+valueHtml(v)+'</td></tr>').join("")+'</table></section>';
   }).join("");
  }
+ async function loadRelatedPosts(current){
+  const section=$("relatedSection"),target=$("relatedPosts");
+  if(!section||!target||!current?.category||!current?.id)return;
+  try{
+   const q=new URLSearchParams({category:current.category,limit:"8",offset:"0"});
+   const r=await fetch(API+"/api/posts?"+q,{cache:"no-store"});
+   if(!r.ok)throw Error("Related updates service returned "+r.status);
+   const data=await r.json();
+   const posts=(data.posts||[]).filter(item=>Number(item.id)!==Number(current.id)).slice(0,4);
+   if(!posts.length){section.hidden=true;return;}
+   target.innerHTML=posts.map(item=>'<article class="related-post-card"><div class="post-meta"><span class="pill">'+esc(item.category_label||item.category||"Update")+'</span><span>'+esc(date(item.published_at||item.created_at))+'</span></div><h3><a href="/detail.html?id='+encodeURIComponent(item.id)+'">'+esc(item.title||"Government Update")+'</a></h3><p>'+esc(excerpt(item.summary||"Open the official notification for full information."))+'</p></article>').join("");
+   section.hidden=false;
+  }catch(error){
+   section.hidden=true;
+   console.error("GO7 related updates:",error);
+  }
+ }
  async function load(){
   if(!API)throw Error("API configuration is missing.");
   if(!slug&&!id)throw Error("Update not found. Return to the homepage and choose a listing.");
@@ -56,6 +74,7 @@
   const mainLink=p.source_url||p.ai_details?.sourceUrl;
   $("detailLinks").innerHTML=(mainLink&&/^https?:\/\//i.test(mainLink)?'<a class="official-link" href="'+esc(mainLink)+'" target="_blank" rel="noopener noreferrer">Open Official / Original Notice ↗</a>':'')+validLinks.map(x=>'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.label||"Official Link")+' ↗</a>').join("")+'<a href="/'+esc(p.category||"latest-jobs")+'/">More '+esc(p.category_label||"Updates")+'</a><a href="/">Back to Jobs GO7 Home</a>';
   $("detailContent").hidden=false;status.textContent="";
+  loadRelatedPosts(p);
  }
  load().catch(e=>{status.textContent=e.message;console.error(e);});
  if($("year"))$("year").textContent=new Date().getFullYear();

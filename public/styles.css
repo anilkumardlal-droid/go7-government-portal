@@ -448,3 +448,38 @@ body{font-size:14px}
 
 /* Full RSS / publisher content on individual post pages */
 .detail-summary{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;max-width:100%;}
+
+
+/* Related updates on individual post pages */
+.related-post-list{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+ gap:10px;
+}
+.related-post-card{
+ min-width:0;
+ padding:12px;
+ background:#fff;
+ border:1px solid var(--line);
+ border-radius:8px;
+}
+.related-post-card h3{
+ margin:7px 0 5px;
+ color:var(--navy);
+ font-size:14px;
+ line-height:1.45;
+}
+.related-post-card h3 a{
+ color:var(--navy);
+ text-decoration:underline;
+ text-decoration-color:#9aa9bd;
+ text-underline-offset:3px;
+ overflow-wrap:anywhere;
+}
+.related-post-card h3 a:hover{color:#c00000;text-decoration-color:#c00000}
+.related-post-card p{
+ margin:0;
+ color:#64748b;
+ font-size:12px;
+ line-height:1.6;
+}
