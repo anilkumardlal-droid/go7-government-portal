@@ -1,29 +1,7 @@
-# Individual posts always use /detail/<slug>/; never rewrite category roots as post details.
-# Redirect category paths without a trailing slash to their canonical URLs.
-#/ latest-jobs route family
-/latest-jobs /latest-jobs/ 301
-/results /results/ 301
-/admit-cards /admit-cards/ 301
-/answer-keys /answer-keys/ 301
-/documents /documents/ 301
-/admissions /admissions/ 301
-/iti-jobs /iti-jobs/ 301
-/outsourcing-jobs /outsourcing-jobs/ 301
-/syllabus /syllabus/ 301
+# Unique individual post URLs only; category folders serve their own index.html by default.
+/detail/:slug/ /detail.html 200
+/detail/:slug /detail.html 200
 
-# Detail route and legacy category aliases
-/detail/:slug/ /detail.html?slug=:slug 200
-/detail/:slug /detail.html?slug=:slug 200
+# Legacy category aliases redirect to their static category folders.
 /category/:slug/ /:slug/ 301
 /category/:slug /:slug/ 301
-
-# Explicit category index routes
-/latest-jobs/ /latest-jobs/index.html 200
-/results/ /results/index.html 200
-/admit-cards/ /admit-cards/index.html 200
-/answer-keys/ /answer-keys/index.html 200
-/documents/ /documents/index.html 200
-/admissions/ /admissions/index.html 200
-/iti-jobs/ /iti-jobs/index.html 200
-/outsourcing-jobs/ /outsourcing-jobs/index.html 200
-/syllabus/ /syllabus/index.html 200

@@ -10,7 +10,7 @@
  const isDetailPath=pathParts[0]==="detail";
  const pathSlug=isDetailPath?(pathParts[1]||""):(pathParts.length===1?pathParts[0]:"");
  const routeIdMatch=isDetailPath?pathSlug.match(/-(\d+)$/):null;
- const slug=slugParam||(pathSlug&&!routeIdMatch&&!pathSlug.includes(".")?pathSlug:"");
+ const slug=routeIdMatch?"":(slugParam||(pathSlug&&!pathSlug.includes(".")?pathSlug:""));
  const id=params.get("id")||(routeIdMatch?routeIdMatch[1]:"");
  const status=$("detailStatus");
  const hasValue=v=>{if(v===null||v===undefined)return false;if(typeof v==="string")return v.trim()!==""&&!/^not mentioned in official notification$/i.test(v.trim())&&!/^not provided$/i.test(v.trim());if(Array.isArray(v))return v.length>0;if(typeof v==="object")return Object.values(v).some(hasValue);return true;};
