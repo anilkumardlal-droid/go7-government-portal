@@ -4,6 +4,8 @@
   const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const dateLabel=value=>{if(!value)return "Recently added";const d=new Date(value);return Number.isNaN(d.getTime())?"Recently added":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});};
   const postHref=post=>post.slug?"/"+encodeURIComponent(post.slug)+"/":"/detail.html?id="+encodeURIComponent(post.id);
+  const isNewPost=post=>{const value=post?.created_at||post?.published_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
+  const newBadge=post=>isNewPost(post)?'<span class="new-post-badge" aria-label="New post">NEW</span> ':"";
   async function loadCategory(panel){
     const cat=panel.dataset.category,target=panel.querySelector(".panel-body"),refresh=panel.querySelector(".panel-refresh");
     if(refresh){refresh.disabled=true;refresh.classList.add("is-loading");}
@@ -12,7 +14,7 @@
       const r=await fetch(url,{cache:"no-store"});
       if(!r.ok)throw new Error("Updates service returned "+r.status);
       const data=await r.json(),posts=data.posts||[];
-      target.innerHTML=posts.length?posts.map(p=>'<a class="post-link feed-link" href="'+postHref(p)+'">'+esc(p.title||"Government Update")+'</a>').join(""):'<p class="empty-panel">No updates published in this category yet.</p>';
+      target.innerHTML=posts.length?posts.map(p=>'<a class="post-link feed-link" href="'+postHref(p)+'">'+newBadge(p)+esc(p.title||"Government Update")+'</a>').join(""):'<p class="empty-panel">No updates published in this category yet.</p>';
     }catch(e){
       console.error("GO7 category load:",cat,e);
       target.innerHTML='<p class="empty-panel">Updates are temporarily unavailable. Please refresh.</p>';
