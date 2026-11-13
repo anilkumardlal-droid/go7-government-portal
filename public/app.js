@@ -29,6 +29,8 @@
   document.querySelectorAll(".home-category-panel[data-category]").forEach(loadCategory);
   $("searchForm")?.addEventListener("submit",e=>{e.preventDefault();const q=$("searchInput")?.value.trim();if(q)searchPosts(q);});
   $("clearSearch")?.addEventListener("click",()=>{$("searchResults").hidden=true;$("searchInput").value="";});
+  const initialQuery=new URLSearchParams(location.search).get("q");
+  if(initialQuery){$("searchInput").value=initialQuery;searchPosts(initialQuery);}
   // Refresh category panels after the feed sync interval without duplicating the global latest feed.
   window.setInterval(()=>document.querySelectorAll(".home-category-panel[data-category]").forEach(loadCategory),60000);
 })();
