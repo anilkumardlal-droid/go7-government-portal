@@ -58,6 +58,22 @@ const decode = s => String(s||"")
   .replace(/&#39;|&apos;/g,"'")
   .replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
 
+function cleanFeedContent(value,max=12000){
+  return decode(String(value||"")
+    .replace(/<!\[CDATA\[|\]\]>/g,"")
+    .replace(/<!--[\s\S]*?-->/g," ")
+    .replace(/<(script|style|noscript)[^>]*>[\s\S]*?<\/\1>/gi," ")
+    .replace(/<(br|\/p|\/div|\/li|\/tr|\/h[1-6])\b[^>]*>/gi,"\n")
+    .replace(/<[^>]+>/g," ")
+    .replace(/&nbsp;/gi," "))
+    .replace(/\r/g,"")
+    .replace(/[\t ]+/g," ")
+    .replace(/\n[\t ]+/g,"\n")
+    .replace(/\n{3,}/g,"\n\n")
+    .trim()
+    .slice(0,max);
+}
+
 function tagValue(block,names){
   for(const name of names){
     const re=new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,"i");
@@ -87,7 +103,7 @@ function parseFeed(xml,source){
     if(!link) link=tagValue(b,["guid","id"]);
 
     const guid=clean(tagValue(b,["guid","id"]),500)||link||title;
-    const summary=clean(tagValue(b,["description","summary","content:encoded","content"]),360);
+    const summary=cleanFeedContent(tagValue(b,["content:encoded","content","description","summary"]),12000);
     const date=tagValue(b,["pubDate","published","updated","dc:date"]);
 
     if(title && safeHttpUrl(link)){
@@ -407,8 +423,17 @@ async function syncAll(env){
       const entries=await fetchFeed(source,env);
       for(const item of entries){
         const guid=(source.feed_url+"|"+item.guid).slice(0,900);
-        const duplicate=await env.DB.prepare("SELECT id FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
-        if(duplicate){rssSkipped++;continue;}
+        const duplicate=await env.DB.prepare("SELECT id,summary FROM posts WHERE lower(title)=lower(?) LIMIT 1").bind(item.title).first();
+        if(duplicate){
+          const incomingSummary=String(item.summary||"").trim();
+          const storedSummary=String(duplicate.summary||"").trim();
+          // A later feed run may expose the publisher's full content: upgrade only when it is longer.
+          if(incomingSummary.length>storedSummary.length){
+            await env.DB.prepare("UPDATE posts SET summary=? WHERE id=?").bind(incomingSummary,duplicate.id).run();
+          }
+          rssSkipped++;
+          continue;
+        }
         const result=await env.DB.prepare(`
           INSERT OR IGNORE INTO posts
           (guid,title,summary,category,source_name,source_url,published_at,status,ai_extraction_status)

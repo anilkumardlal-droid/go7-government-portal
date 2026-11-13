@@ -444,3 +444,7 @@ body{font-size:14px}
 /* Convert the supplied transparent color logo to white only on dark surfaces */
 .footer-brand-logo{filter:brightness(0) invert(1)}
 @media(max-width:760px){.brand-logo{filter:brightness(0) invert(1)}}
+
+
+/* Full RSS / publisher content on individual post pages */
+.detail-summary{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;max-width:100%;}
