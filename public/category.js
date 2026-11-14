@@ -7,7 +7,7 @@
  const href=p=>p.id?"/detail.html?id="+encodeURIComponent(p.id):"#";
  const isNewPost=p=>{const value=p?.published_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
  const newBadge=p=>isNewPost(p)?'<span class="new-post-badge" aria-label="New post">NEW</span> ':"";
- const closedBadge=p=>{if(!p?.application_last_date)return"";const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());return String(p.application_last_date).slice(0,10)<today?'<span class="pill">Applications closed</span> ':"";};
+ const closedBadge=p=>{if(!p?.application_last_date)return"";const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());return String(p.application_last_date).slice(0,10)<today?'<span class="pill">Closed</span> ':"";};
  const excerpt=value=>{const text=String(value||"").replace(/\s+/g," ").trim();return text.length>260?text.slice(0,257).trimEnd()+"…":text;};
  function render(posts,append){const html=posts.map(p=>`<li class="category-post-card"><span class="post-list-marker" aria-hidden="true">*</span><h2><a href="${href(p)}">${esc(p.title||"Government Update")}</a></h2></li>`).join("");if(append)$("postList").insertAdjacentHTML("beforeend",html);else $("postList").innerHTML=html;}
  async function load(append=false){if(loading||!API)return;loading=true;const btn=$("loadMore");if(btn){btn.disabled=true;btn.textContent="Loading…";}if(!append)offset=0;$("status").textContent=append?"Loading more updates…":"Loading updates…";
