@@ -743,3 +743,8 @@ body{font-size:14px}
     display:none;
   }
 }
+
+/* Compact vertical spacing for category and search result cards */
+.category-post-card, .search-result-card {
+  padding: 0px 12px;
+}
