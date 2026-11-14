@@ -48,9 +48,13 @@ jobs:
           missing = [slug for slug in categories if not (root / slug / "index.html").is_file()]
           assert not missing, f"Missing consolidated category pages: {missing}"
 
-          sitemap = (root / "sitemap.xml").read_text(encoding="utf-8")
+          sitemap_index = (root / "sitemap.xml").read_text(encoding="utf-8")
+          category_sitemap_path = root / "sitemap-categories.xml"
+          assert category_sitemap_path.is_file(), "Category sitemap is missing"
+          category_sitemap = category_sitemap_path.read_text(encoding="utf-8")
+          assert "https://jobs.go7.in/sitemap-categories.xml" in sitemap_index, "Category sitemap is missing from sitemap index"
           for slug in categories:
-              assert f"https://jobs.go7.in/{slug}/" in sitemap, f"{slug} missing from sitemap"
+              assert f"https://jobs.go7.in/{slug}/" in category_sitemap, f"{slug} missing from category sitemap"
 
           redirects = (root / "_redirects").read_text(encoding="utf-8")
           assert "/detail/:slug/ /detail.html 200" in redirects
