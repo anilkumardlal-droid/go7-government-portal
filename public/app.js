@@ -6,7 +6,7 @@
   const postHref=post=>post.id?"/detail.html?id="+encodeURIComponent(post.id):"#";
   const isNewPost=post=>{const value=post?.published_at;if(!value)return false;const time=new Date(value).getTime(),age=Date.now()-time;return Number.isFinite(time)&&age>=0&&age<=259200000;};
   const isExpired=value=>{if(!value)return false;const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());return String(value).slice(0,10)<today;};
-  const closedBadge=post=>isExpired(post?.application_last_date)?'<span class="pill">APPLICATION CLOSED</span> ':"";
+  const closedBadge=post=>isExpired(post?.application_last_date)?'<span class="pill">Applications closed</span> ':"";
   const newBadge=post=>isNewPost(post)?'<span class="new-post-badge" aria-label="New post">NEW</span> ':"";
   async function loadCategory(panel){
     const cat=panel.dataset.category,target=panel.querySelector(".panel-body"),refresh=panel.querySelector(".panel-refresh");
