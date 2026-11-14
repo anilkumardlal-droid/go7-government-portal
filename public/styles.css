@@ -687,3 +687,15 @@ body{font-size:14px}
   text-underline-offset:2px;
   line-height:1.3;
 }
+
+
+/* User-requested navigation icon and mobile menu sizing */
+.main-nav .home-icon svg{
+  width:20px;
+  height:20px;
+}
+@media(max-width:760px){
+  .menu-toggle{
+    font-size:18px;
+  }
+}
