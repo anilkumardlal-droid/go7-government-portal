@@ -94,7 +94,7 @@ jobs:
           assert "env.AI.toMarkdown" in worker_js, "Automatic HTML/PDF conversion is missing"
           assert "function officialPdfLinks" in worker_js, "Official PDF discovery is missing"
           assert "extractNoticeDatesFromText" in worker_js
-          assert "syncOfficialMonitors(env.DB,env,dateBudget)" in worker_js
+          assert "syncOfficialMonitors(env.DB,env,dateBudget,publishedThisSyncByCategory)" in worker_js
           assert "auto_published:inserted" in worker_js
           assert "const reviewMatch=path.match" not in worker_js, "Manual approval/dismiss API must stay removed"
           assert "const dateBudget={used:0,max:2}" in worker_js
