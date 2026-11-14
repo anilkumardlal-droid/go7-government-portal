@@ -699,3 +699,48 @@ body{font-size:14px}
     font-size:18px;
   }
 }
+
+
+/* Smooth homepage update-strip marquee */
+.update-marquee{
+  flex:1 1 auto;
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+}
+.update-marquee-track{
+  display:flex;
+  width:max-content;
+  animation:go7-update-marquee 38s linear infinite;
+  will-change:transform;
+}
+.update-marquee-track span{
+  display:block;
+  flex:0 0 auto;
+  padding-right:4rem;
+  min-width:0;
+}
+.update-marquee:hover .update-marquee-track{
+  animation-play-state:paused;
+}
+@keyframes go7-update-marquee{
+  from{transform:translateX(0)}
+  to{transform:translateX(-50%)}
+}
+@media (prefers-reduced-motion: reduce){
+  .update-marquee-track{
+    display:block;
+    width:auto;
+    animation:none;
+    transform:none;
+    will-change:auto;
+  }
+  .update-marquee-track span:first-child{
+    display:inline;
+    white-space:normal;
+    padding-right:0;
+  }
+  .update-marquee-track span:nth-child(2){
+    display:none;
+  }
+}
