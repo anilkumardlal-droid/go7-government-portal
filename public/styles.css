@@ -59,8 +59,7 @@ button,input,select,textarea{font:inherit}
 .view-all{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;min-height:30px;padding:5px 9px;border:1px solid #dce4ef;border-radius:5px;background:#fff;color:var(--navy);font-size:10px;font-weight:700;text-decoration:none;white-space:nowrap}
 .view-all:hover{background:var(--navy);border-color:var(--navy);color:#fff}
 .panel-body{display:flex;flex-direction:column;gap:0;flex:1}
-.post-link,.feed-link,.post-card-link,.post-grid .post a{display:block;padding:8px 0;border-bottom:1px solid #edf0f4;color:#0000ef;text-decoration-line:underline;text-decoration-color:blue;text-underline-offset:2px;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
-.post-link:last-child,.feed-link:last-child{border-bottom:0}
+.post-link,.feed-link,.post-card-link,.post-grid .post a{display:block;padding:8px 0;color:#0000ef;text-decoration-line:underline;text-decoration-color:blue;text-underline-offset:2px;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
 .post-link:hover,.feed-link:hover,.post-card-link:hover{color:#c00000;text-decoration-color:#c00000}
 .loading-note,.empty-panel{margin:0;padding:12px 0;color:#8490a1;font-size:11px}
 .search-results{margin:0 0 18px;padding:16px;background:#fff;border:1px solid var(--line);border-radius:10px}
