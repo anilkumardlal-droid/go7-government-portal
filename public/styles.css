@@ -130,8 +130,8 @@ button,input,select,textarea{font:inherit}
 @media(max-width:900px){.main-nav>a{padding-inline:9px;font-size:11px}.nav-more summary{padding-inline:10px}.quick-links{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){
  .container{width:calc(100% - 24px)}
- .site-header{width:100%;margin:8px 0 0;border:0;border-radius:0;background:#102a50;overflow:visible}
- .site-header>.container{width:100%;padding:0 12px;background:#102a50;border-radius:0}
+ .site-header{width:100%;margin:0;border:0;border-radius:0;background:#102a50;overflow:visible}
+ .site-header>.container{width:100%;padding:0 12px 12px;background:#102a50;border-radius:0}
  .brand-row{min-height:62px}
  .brand{color:#fcfcfc;font-size:29px}
  .header-note{display:none}
