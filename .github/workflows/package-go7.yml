@@ -85,7 +85,7 @@ jobs:
           assert "pathSlug.match(/-(\\d+)$/)" in detail_js
           assert "p.ai_details?.overview||p.summary" in detail_js
           assert (root / "search.html").is_file() and (root / "search.js").is_file()
-          assert "application_last_date" in detail_js and "Applications closed" in category_js
+          assert "application_last_date" in detail_js and "Closed" in category_js
           assert "Automatic publishing is enabled" in (root / "go7-owner-desk-7f3c9a/index.html").read_text(encoding="utf-8")
           assert "Auto-published official notices" in admin_js
           assert "data-approve" not in admin_js and "Approve & publish" not in admin_js, "Manual review approval controls must stay removed"
