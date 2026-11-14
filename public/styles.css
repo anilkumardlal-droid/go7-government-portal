@@ -77,7 +77,7 @@ button,input,select,textarea{font:inherit}
 .editorial-content h3{margin:13px 0 4px;color:var(--navy);font-size:14px}
 .editorial-content p,.faq-section p{margin:6px 0;color:#5d6c80;font-size:11px;line-height:1.7}
 .faq-section details{padding:9px 0;border-top:1px solid #edf0f4}
-.faq-section summary{color:var(--navy);font-size:12px;font-weight:700;cursor:pointer}
+.faq-section summary{color:var(--navy);font-size:12px;font-weight:600;cursor:pointer}
 .disclaimer{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding:11px 13px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--red);border-radius:7px;color:#59687d;font-size:10px}
 .disclaimer strong{color:var(--red)}
 .disclaimer span{flex:1 1 450px}
