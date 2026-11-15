@@ -90,8 +90,9 @@ function isConcreteGovtNotice(title, summary = "") {
   const titleSignals = /\b(?:recruitment|vacanc(?:y|ies)|hiring|selection|shortlist|result|admit\s+card|hall\s+ticket|answer\s+key|examination|exam)\b/i;
   const detailSignals = /\b(?:advertisement|notification|application|last\s+date|apply|post|vacanc|CEN|advt|exam\s+date|result|selection)\b/i;
   const employmentNewsRow = /\bofficial employment news listing\b/i.test(s) &&
-    /\bissued date:/i.test(s) && /\blast date:\s*(?!not shown|n\/a|na\b)/i.test(s) &&
-    /\b(?:officer|assistant|scientist|engineer|technician|clerk|teacher|manager|constable|nurse|accountant|executive|inspector|operator)\b/i.test(t);
+    /\bissued date:/i.test(s) &&
+    /\blast date:\s*(?!not shown|n\/a|na\b)/i.test(s) &&
+    /\bappointment:\s*(?:recruitment|contractual|deputation|re-employment|absorption)\b/i.test(s);
   return employmentNewsRow || (titleSignals.test(t) && detailSignals.test(s));
 }
 
@@ -1232,16 +1233,16 @@ async function ensureDefaultOfficialRssSources(db){
   }
 }
 
-function createAdminSyncReporter(db,runId){
+function createAdminSyncReporter(db,runId,stateKey="admin_sync_status"){
   let state={run_id:runId,status:"running",phase:"starting",progress:0,message:"Preparing sync…",errors:[]};
   let queue=Promise.resolve();
   return patch=>{
     state={...state,...patch,run_id:runId,updated_at:new Date().toISOString()};
     const value=JSON.stringify(state);
     queue=queue.then(()=>db.prepare(
-      "INSERT INTO sync_state(state_key,state_value) VALUES('admin_sync_status',?) " +
+      "INSERT INTO sync_state(state_key,state_value) VALUES(?,?) " +
       "ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value,updated_at=CURRENT_TIMESTAMP"
-    ).bind(value).run());
+    ).bind(stateKey,value).run());
     return queue;
   };
 }
@@ -1408,11 +1409,16 @@ async function syncAll(env,onProgress=async()=>{}){
     skipped:rssSkipped+officialResult.skipped,
     errors
   };
+  const completedWithErrors=errors.length>0;
   await onProgress({
-    status:"completed",
+    status:completedWithErrors?"completed_with_errors":"completed",
     phase:"completed",
     progress:100,
-    message:"Sync completed successfully.",
+    message:completedWithErrors
+      ? "Sync finished with "+errors.length+" source error(s). Check Source Health."
+      : syncResult.inserted
+        ? "Sync completed successfully. New verified posts were published."
+        : "Sync completed. No new qualifying notices were found.",
     finished_at:new Date().toISOString(),
     inserted:syncResult.inserted,
     skipped:syncResult.skipped,
@@ -1739,10 +1745,22 @@ export default {
         }
 
         if(path==="/api/admin/sync/status"&&request.method==="GET"){
-          const row=await env.DB.prepare("SELECT state_value,updated_at FROM sync_state WHERE state_key='admin_sync_status'").first();
-          let status=null;
-          try{status=row?.state_value?JSON.parse(row.state_value):null;}catch{status={status:"unknown",message:"Saved status could not be parsed."};}
-          return json({status,updated_at:row?.updated_at||null},200,corsOrigin);
+          const rows=await env.DB.prepare(
+            "SELECT state_key,state_value,updated_at FROM sync_state WHERE state_key IN (?,?)"
+          ).bind("admin_sync_status","scheduled_sync_status").all();
+          const records=(rows.results||[]).map(row=>{
+            let status=null;
+            try{status=JSON.parse(row.state_value||"null");}
+            catch{status={status:"unknown",message:"Saved status could not be parsed."};}
+            return {key:row.state_key,status,updated_at:row.updated_at||null};
+          }).sort((a,b)=>String(b.updated_at||"").localeCompare(String(a.updated_at||"")));
+          const latest=records[0]||null;
+          return json({
+            status:latest?.status||null,
+            updated_at:latest?.updated_at||null,
+            manual_status:records.find(x=>x.key==="admin_sync_status")?.status||null,
+            automatic_status:records.find(x=>x.key==="scheduled_sync_status")?.status||null
+          },200,corsOrigin);
         }
 
         if (path === "/api/admin/ai/pending" && request.method === "GET") {
@@ -1845,9 +1863,10 @@ export default {
           const report=createAdminSyncReporter(env.DB,runId);
           await report({
             status:"running",
+            trigger:"manual",
             phase:"starting",
             progress:1,
-            message:"Starting GO7 sync process…",
+            message:"Starting manual GO7 sync process…",
             started_at:new Date().toISOString(),
             rss_checked:0,
             rss_total:0,
@@ -1913,7 +1932,44 @@ export default {
 
   async scheduled(controller,env,ctx){
     ctx.waitUntil((async()=>{
-      await syncAll(env);
+      const runId=crypto.randomUUID();
+      const report=createAdminSyncReporter(env.DB,runId,"scheduled_sync_status");
+      await report({
+        status:"running",
+        trigger:"automatic",
+        phase:"starting",
+        progress:1,
+        message:"Automatic 30-minute sync started.",
+        started_at:new Date().toISOString(),
+        rss_checked:0,
+        rss_total:0,
+        official_checked:0,
+        official_batch_total:0,
+        official_total:OFFICIAL_MONITORS.length,
+        inserted:0,
+        skipped:0,
+        errors:[]
+      });
+      try{
+        const result=await syncAll(env,report);
+        console.log("GO7 scheduled sync finished",JSON.stringify({
+          inserted:result.inserted,
+          skipped:result.skipped,
+          sources_checked:result.sources_checked,
+          errors:result.errors.length
+        }));
+      }catch(error){
+        await report({
+          status:"failed",
+          phase:"failed",
+          progress:100,
+          message:"Automatic sync failed: "+clean(error.message,220),
+          error:clean(error.message,300),
+          errors:[clean(error.message,300)],
+          finished_at:new Date().toISOString()
+        });
+        throw error;
+      }
       // AI PDF extraction is intentionally manual from the Admin Panel.
     })().catch(error => console.error("GO7 scheduled sync / AI extraction failed:", error)));
   }
