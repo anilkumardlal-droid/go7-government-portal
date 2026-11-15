@@ -94,6 +94,8 @@ jobs:
           assert "Sync process monitor" in admin_console and "syncProgressBar" in admin_console, "Live sync monitor is missing from Admin"
           assert 'name="robots" content="noindex,nofollow"' in admin_console, "Admin console must remain noindex"
           assert "renderSyncStatus" in admin_js and "/api/admin/sync/status" in admin_js, "Admin live status polling is missing"
+          assert "Live Worker status unavailable:" in admin_js, "Admin must show a clear error when live Worker progress is unavailable"
+          assert 'admin.js?v=go7-admin-live-real-20261115' in admin_console, "Admin script cache must be refreshed for live status polling"
 
           worker_js = (worker / "src/index.js").read_text(encoding="utf-8")
           assert "createAdminSyncReporter" in worker_js and "admin_sync_status" in worker_js, "D1-backed admin progress reporter is missing"
