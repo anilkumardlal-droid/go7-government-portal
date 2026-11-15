@@ -1154,3 +1154,9 @@ body.admin-page{
  .go7-post-section p,.go7-notice-missing,.go7-post-bullets li,.go7-related-list a,.go7-related-list small{font-size:14px}
  .go7-share-row,.go7-share-row strong,.go7-share-row a{font-size:14px}
 }
+
+/* Keep even empty-state and informational paragraph text at 14px minimum */
+.go7-related-box p,
+.go7-related-box>div>p{font-size:14px;line-height:1.6}
+.go7-section-table p,.go7-subsection-table p{font-size:14px}
+.go7-info-table td,.go7-info-table th,.go7-subsection-table th{font-size:14px}
