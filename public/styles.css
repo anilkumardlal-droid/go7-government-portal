@@ -912,3 +912,46 @@ body.admin-page{
   .sync-state.running:before{animation:none}
   .sync-progress-track>span{transition:none}
 }
+/* Admin real logo and inline SVG icon system */
+.admin-brand{gap:12px}
+.admin-brand-logo{
+  display:block;width:148px;height:48px;padding:4px 9px;
+  border-radius:8px;background:#fff;object-fit:contain;object-position:center;
+}
+.admin-brand-context{
+  padding-left:12px;border-left:1px solid rgba(255,255,255,.3);
+  color:#dce8f7;font-size:10px;font-weight:800;letter-spacing:1px;
+}
+.admin-icon{
+  display:inline-block;width:18px;height:18px;flex:0 0 18px;
+  fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;
+}
+.admin-title-with-icon{display:flex;align-items:center;gap:9px}
+.admin-title-with-icon>.admin-icon{width:20px;height:20px;color:#3850d5}
+.sync-state{gap:7px}
+.sync-state>.admin-icon{width:14px;height:14px}
+.sync-results-heading{
+  display:flex;align-items:center;gap:8px;margin:0 0 10px;
+  color:#34445a;font-size:12px;font-weight:800;
+}
+.sync-results-heading>.admin-icon{width:17px;height:17px;color:#3850d5}
+.sync-stat>.admin-icon{width:19px;height:19px;margin-bottom:8px;color:#3850d5}
+.sync-category-row{grid-template-columns:20px minmax(0,1fr) auto;align-items:center}
+.sync-category-row>.admin-icon{width:18px;height:18px;color:#3850d5}
+.sync-category-row span{min-width:0}
+.sync-category-row small{grid-column:2/-1}
+.sync-error-list li{overflow-wrap:anywhere;padding:2px 0}
+.sync-no-errors{display:flex;align-items:center;gap:7px}
+.sync-no-errors>.admin-icon{color:#16834b}
+.admin-button-icon{display:inline-flex;align-items:center;gap:7px}
+.admin-button-icon>.admin-icon{width:15px;height:15px}
+@media(max-width:760px){
+  .admin-brand-logo{width:126px;height:44px}
+  .admin-brand-context{font-size:9px;padding-left:9px}
+  .sync-category-row{grid-template-columns:20px minmax(0,1fr) auto}
+}
+@media(max-width:390px){
+  .admin-brand-logo{width:108px;height:40px;padding:3px 6px}
+  .admin-brand-context{max-width:100px;line-height:1.3}
+}
