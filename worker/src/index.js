@@ -774,7 +774,7 @@ const OFFICIAL_MONITORS = [
     name:"National Testing Agency Admissions & Notices",
     category:"admissions-education",
     parser:"education",
-    urls:["https://www.nta.ac.in/NoticeBoardArchive"],
+    urls:["https://nta.ac.in/NoticeBoardArchive","https://www.nta.ac.in/NoticeBoardArchive"],
     hosts:["www.nta.ac.in","nta.ac.in"]
   },
   {
@@ -813,7 +813,8 @@ function extractOfficialLinks(html,pageUrl,monitor){
     const hrefMatch=anchor.match(/\bhref\s*=\s*(["'])(.*?)\1/i);
     if(!hrefMatch)continue;
     const title=clean(decode(anchor.replace(/<[^>]*>/g," ")),220);
-    if((!RECRUITMENT_RE.test(title)&&!EDUCATION_NOTICE_RE.test(title))||
+    if((!RECRUITMENT_RE.test(title)&&!HINDI_RECRUITMENT_RE.test(title)&&
+        !EDUCATION_NOTICE_RE.test(title)&&!HINDI_EDUCATION_RE.test(title))||
        !isConcreteFeedNotice(title)||IGNORE_RE.test(title))continue;
 
     let target;
@@ -909,7 +910,8 @@ function extractOfficialTableRows(html,pageUrl,monitor){
       400
     )).filter(cell=>cell&& !actionCell.test(cell.trim()));
     const title=clean(cleanedTitleCells.slice(0,3).join(" - "),220);
-    if(!RECRUITMENT_RE.test(rowText)||!isConcreteGovtNotice(title,rowText))continue;
+    if((!RECRUITMENT_RE.test(rowText)&&!HINDI_RECRUITMENT_RE.test(rowText))||
+       !isConcreteGovtNotice(title,rowText))continue;
 
     const linkCandidates=[...row.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].map(match=>{
       const label=cleanFeedContent(match[2],160);
@@ -1017,6 +1019,7 @@ function extractOfficialEducationEntries(html,pageUrl,monitor){
 
 async function fetchOfficialMonitor(monitor){
   const failures=[];
+  let reachableUrl=null;
 
   for(const pageUrl of monitor.urls){
     try{
@@ -1024,10 +1027,13 @@ async function fetchOfficialMonitor(monitor){
         method:"GET",
         redirect:"follow",
         headers:{
+          "User-Agent":"Mozilla/5.0 (compatible; GO7GovernmentUpdates/1.0; +https://jobs.go7.in/)",
           "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language":"en-IN,en;q=0.9"
+          "Accept-Language":"en-IN,en;q=0.9",
+          "Cache-Control":"no-cache",
+          "Referer":"https://jobs.go7.in/"
         },
-      },2,9000);
+      },2,12000);
 
       if(!response.ok){
         failures.push(
@@ -1036,6 +1042,7 @@ async function fetchOfficialMonitor(monitor){
         continue;
       }
 
+      reachableUrl=pageUrl;
       const html=await response.text();
 
       if(html.length>2500000){
@@ -1078,8 +1085,9 @@ failures.push(
 
   return {
     entries:[],
-    checkedUrl:null,
-    error:failures.join("; ")||"No official page could be fetched"
+    checkedUrl:reachableUrl,
+    no_matches:Boolean(reachableUrl),
+    error:reachableUrl?null:(failures.join("; ")||"No official page could be fetched")
   };
 }
 
