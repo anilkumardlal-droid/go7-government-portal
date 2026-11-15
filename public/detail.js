@@ -134,10 +134,10 @@
     return '<div class="go7-related-grid"><section class="go7-related-box"><h3>Latest Posts</h3><div id="latestPosts">Loading latest updates…</div></section><section class="go7-related-box"><h3>Related Posts</h3><div id="relatedPosts">Loading related updates…</div></section></div>';
   }
   function cleanOverview(value,title){
-    let text=String(value||"").replace(/\\s+/g," ").trim();
+    let text=String(value||"").replace(/\s+/g," ").trim();
     // Remove a known feed-parser prefix such as "102 | August August |" from imported summaries.
-    text=text.replace(/^\\s*\\d{1,6}\\s*\\|\\s*[A-Za-z]{3,}\\s+[A-Za-z]{3,}\\s*\\|\\s*/,"");
-    text=text.replace(/\\b([A-Za-z]{3,})\\s+\\1\\b/gi,"$1");
+    text=text.replace(/^\s*\d{1,6}\s*\|\s*[A-Za-z]{3,}\s+[A-Za-z]{3,}\s*\|\s*/,"");
+    text=text.replace(/\b([A-Za-z]{3,})\s+\1\b/gi,"$1");
     const normalize=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     const cleanTitle=normalize(title),cleanText=normalize(text);
     if(cleanText===cleanTitle)return "";
@@ -200,7 +200,8 @@
     parts.push(section("Latest & Related Updates",renderRelatedShell(),"go7-related-section"));
     const topShare=shareButtons(p,"top");
     const bottomShare=shareButtons(p,"bottom");
-    const feedback='<div class="go7-correction-box"><span>Found an error or outdated information? Share the GO7 page URL and the original official notice so we can review it.</span><a href="mailto:jobs@go7.in?subject='+encodeURIComponent("Correction request: "+(p.title||"GO7 update"))+'&body='+encodeURIComponent("GO7 page: "+shareUrl+"\nOriginal source: "+(p.source_url||"")+"\n\nCorrection details:")+'">Report a Correction</a></div>';
+    const pageUrl="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
+    const feedback='<div class="go7-correction-box"><span>Found an error or outdated information? Share the GO7 page URL and the original official notice so we can review it.</span><a href="mailto:jobs@go7.in?subject='+encodeURIComponent("Correction request: "+(p.title||"GO7 update"))+'&body='+encodeURIComponent("GO7 page: "+pageUrl+"\nOriginal source: "+(p.source_url||"")+"\n\nCorrection details:")+'">Report a Correction</a></div>';
     // Share links appear both near the introduction and after the useful information, matching the reference page flow.
     parts.splice(1,0,topShare);
     return parts.filter(Boolean).join("")+bottomShare+feedback;
