@@ -216,7 +216,8 @@
   }
   function updateMetadata(p){
     const title=readableTitle(p.title||"Update Details")+" | Jobs GO7";
-    const description=String(p.ai_details?.overview||p.summary||"Government recruitment, result, admit card and examination updates on Jobs GO7.").replace(/\s+/g," ").slice(0,220);
+    const cleanDescription=cleanOverview(p.ai_details?.overview||p.summary||"",p.title);
+    const description=String(cleanDescription||"Government recruitment, result, admit card and examination updates on Jobs GO7.").replace(/\s+/g," ").slice(0,220);
     const canonical="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
     document.title=title;
     setMeta('meta[name="description"]',"content",description);
