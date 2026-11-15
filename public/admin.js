@@ -23,30 +23,81 @@ $("add").onclick=async()=>{
   catch(e){say(e.message);}
 };
 
+function renderSyncStatus(s){
+  if(!s)return;
+  const progress=Math.max(0,Math.min(100,Number(s.progress)||0));
+  const bar=$("syncProgressBar");
+  if(bar)bar.style.width=progress+"%";
+  $("syncPercent").textContent=Math.round(progress)+"%";
+  $("syncMessage").textContent=s.message||"No process message.";
+  $("syncCurrent").textContent=s.current_item?"Current source: "+s.current_item:"";
+  const state=s.status||"idle";
+  $("syncState").textContent=state==="running"?"In progress":state==="completed"?"Completed":state==="failed"?"Failed":"Idle";
+  $("syncState").className="sync-state "+state;
+  $("syncStats").innerHTML=[
+    ["RSS feeds",`${s.rss_checked||0}/${s.rss_total||0}`],
+    ["Official checks",`${s.official_checked||0}/${s.official_batch_total||0}`],
+    ["New posts",Number(s.inserted)||0],
+    ["Skipped / existing",Number(s.skipped)||0],
+    ["Date checks",Number(s.date_checks)||0],
+    ["Errors",Array.isArray(s.errors)?s.errors.length:0]
+  ].map(([label,value])=>`<div class="sync-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("");
+
+  const categories=s.category_summary||s.result?.category_summary||[];
+  const errors=s.errors||s.result?.errors||[];
+  let resultHtml="";
+  if(categories.length){
+    resultHtml+=`<div class="sync-result-heading">Category-wise published posts</div><div class="sync-category-list">${categories.map(row=>`<div class="sync-category-row"><span>${escapeHtml(row.label||row.category)}</span><strong>${Number(row.published_total)||0} total</strong><small>+${Number(row.published_this_sync)||0} this sync</small></div>`).join("")}</div>`;
+  }
+  if(errors.length){
+    resultHtml+=`<div class="sync-result-heading error-heading">Recent errors</div><ul class="sync-error-list">${errors.map(error=>`<li>${escapeHtml(error)}</li>`).join("")}</ul>`;
+  }else if(state==="completed"){
+    resultHtml+='<p class="sync-no-errors">No source errors reported in this run.</p>';
+  }
+  $("syncResults").innerHTML=resultHtml||'<p class="sync-result-empty">Detailed results will appear here as the process runs.</p>';
+}
+
+async function refreshSyncStatus(){
+  const response=await call("/api/admin/sync/status");
+  if(response.status)renderSyncStatus(response.status);
+  else $("syncMessage").textContent="No sync process has been recorded yet.";
+  return response.status;
+}
+
+$("refreshSyncStatus").onclick=async()=>{
+  try{await refreshSyncStatus();say("Latest process status refreshed.");}
+  catch(e){say("Could not load process status: "+e.message);}
+};
+
 $("sync").onclick = async () => {
   const button=$("sync");
+  let pollTimer=null;
   button.disabled=true;
   button.classList.add("is-loading");
-  button.textContent="Syncing RSS feeds…";
+  button.textContent="Syncing…";
+  $("syncState").textContent="In progress";
+  $("syncState").className="sync-state running";
+  $("syncMessage").textContent="Starting GO7 sync process…";
+  $("syncProgressBar").style.width="1%";
+  $("syncPercent").textContent="1%";
   try {
-    say("Checking configured RSS feeds and official notices…");
-    const d = await call("/api/admin/sync", "POST", {});
+    say("Sync request started. Live progress is updating below.");
+    await refreshSyncStatus().catch(()=>{});
+    pollTimer=window.setInterval(()=>refreshSyncStatus().catch(error=>console.warn("GO7 sync status:",error)),1200);
+    const d=await call("/api/admin/sync","POST",{});
+    await refreshSyncStatus().catch(()=>{});
     say(
-      `Sync completed: ${d.sources_checked || 0} sources checked, ` +
-      `${d.inserted || 0} new items, ` +
-      `${d.skipped || 0} already existing. ` +
-      `Government monitors checked: ${d.official?.checked || 0}/${d.official?.total || 0} in this run; ${d.official?.remaining || 0} will rotate through later syncs. ` +
-      `Dates auto-read from ${d.date_extraction?.checked || 0} official pages/PDFs in this run (maximum ${d.date_extraction?.limit || 2}); remaining items continue on later syncs. ` +
-      `Auto-published official notices: ${d.official?.auto_published || 0}. ` +
-      `Older notices awaiting official re-check: ${d.review_pending || 0}. ` +
-      `Category-wise published posts: ${(d.category_summary || []).map(c =>
-        `${c.label}: ${c.published_this_sync || 0} new, ${c.published_total || 0} total`
-      ).join(" | ") || "Category report unavailable"}. ` +
-      `Errors: ${(d.errors || []).join(" | ") || "None"}`
+      `Sync completed: ${d.sources_checked||0} sources checked, `+
+      `${d.inserted||0} new items, ${d.skipped||0} already existing. `+
+      `Auto-published official notices: ${d.official?.auto_published||0}. `+
+      `Older notices awaiting official re-check: ${d.review_pending||0}. `+
+      `Errors: ${(d.errors||[]).join(" | ")||"None"}`
     );
-  } catch (e) {
-    say("Sync failed: " + e.message);
+  } catch(e) {
+    say("Sync failed: "+e.message);
+    await refreshSyncStatus().catch(()=>{});
   } finally {
+    if(pollTimer)window.clearInterval(pollTimer);
     button.disabled=false;
     button.classList.remove("is-loading");
     button.textContent="Sync RSS feeds";
