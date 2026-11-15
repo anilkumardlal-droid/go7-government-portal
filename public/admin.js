@@ -23,36 +23,69 @@ $("add").onclick=async()=>{
   catch(e){say(e.message);}
 };
 
+function adminSvg(name){
+  const paths={
+    activity:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+    rss:'<path d="M5 19a2 2 0 1 0 0 .01"/><path d="M5 12a7 7 0 0 1 7 7"/><path d="M5 5a14 14 0 0 1 14 14"/>',
+    globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    skip:'<path d="m5 4 10 8L5 20zM19 5v14"/>',
+    calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+    alert:'<path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/>',
+    check:'<path d="m5 12 4 4L19 6"/>',
+    jobs:'<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18m-11 0v2h4v-2"/>',
+    result:'<path d="M5 3h14v18H5zM8 8h8M8 12h4m-4 4 2 2 4-4"/>',
+    exam:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9m-3 3 3 3m-6 0 3 3"/>',
+    education:'<path d="m2 9 10-5 10 5-10 5L2 9Z"/><path d="M6 11v5c3 3 9 3 12 0v-5m4-2v7"/>',
+    notice:'<path d="M4 19V5m0 1h13l-2 4 2 4H4"/>',
+    file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/>'
+  };
+  return '<svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'+(paths[name]||paths.activity)+'</svg>';
+}
+function categoryIcon(category){
+  const value=String(category||"").toLowerCase();
+  if(value.includes("job"))return "jobs";
+  if(value.includes("result"))return "result";
+  if(value.includes("admit")||value.includes("exam"))return "exam";
+  if(value.includes("answer"))return "key";
+  if(value.includes("education")||value.includes("admission"))return "education";
+  return "notice";
+}
 function renderSyncStatus(s){
   if(!s)return;
   const progress=Math.max(0,Math.min(100,Number(s.progress)||0));
   const bar=$("syncProgressBar");
   if(bar)bar.style.width=progress+"%";
   $("syncPercent").textContent=Math.round(progress)+"%";
+  const progressTrack=document.querySelector(".sync-progress-track");
+  if(progressTrack)progressTrack.setAttribute("aria-valuenow",String(Math.round(progress)));
   $("syncMessage").textContent=s.message||"No process message.";
   $("syncCurrent").textContent=s.current_item?"Current source: "+s.current_item:"";
   const state=s.status||"idle";
-  $("syncState").textContent=state==="running"?"In progress":state==="completed"?"Completed":state==="failed"?"Failed":"Idle";
+  const stateLabel=state==="running"?"In progress":state==="completed"?"Completed":state==="failed"?"Failed":"Idle";
+  $("syncState").innerHTML=adminSvg(state==="completed"?"check":state==="failed"?"alert":"activity")+'<span>'+stateLabel+'</span>';
   $("syncState").className="sync-state "+state;
-  $("syncStats").innerHTML=[
-    ["RSS feeds",`${s.rss_checked||0}/${s.rss_total||0}`],
-    ["Official checks",`${s.official_checked||0}/${s.official_batch_total||0}`],
-    ["New posts",Number(s.inserted)||0],
-    ["Skipped / existing",Number(s.skipped)||0],
-    ["Date checks",Number(s.date_checks)||0],
-    ["Errors",Array.isArray(s.errors)?s.errors.length:0]
-  ].map(([label,value])=>`<div class="sync-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("");
+  const stats=[
+    ["rss","RSS feeds",`${s.rss_checked||0}/${s.rss_total||0}`],
+    ["globe","Official checks",`${s.official_checked||0}/${s.official_batch_total||0}`],
+    ["plus","New posts",Number(s.inserted)||0],
+    ["skip","Skipped / existing",Number(s.skipped)||0],
+    ["calendar","Date checks",Number(s.date_checks)||0],
+    ["alert","Errors",Array.isArray(s.errors)?s.errors.length:0]
+  ];
+  $("syncStats").innerHTML=stats.map(([icon,label,value])=>`<div class="sync-stat">${adminSvg(icon)}<strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("");
 
   const categories=s.category_summary||s.result?.category_summary||[];
   const errors=s.errors||s.result?.errors||[];
   let resultHtml="";
   if(categories.length){
-    resultHtml+=`<div class="sync-result-heading">Category-wise published posts</div><div class="sync-category-list">${categories.map(row=>`<div class="sync-category-row"><span>${escapeHtml(row.label||row.category)}</span><strong>${Number(row.published_total)||0} total</strong><small>+${Number(row.published_this_sync)||0} this sync</small></div>`).join("")}</div>`;
+    resultHtml+=`<div class="sync-result-heading">Category-wise published posts</div><div class="sync-category-list">${categories.map(row=>`<div class="sync-category-row">${adminSvg(categoryIcon(row.category||row.label))}<span>${escapeHtml(row.label||row.category)}</span><strong>${Number(row.published_total)||0} total</strong><small>+${Number(row.published_this_sync)||0} this sync</small></div>`).join("")}</div>`;
   }
   if(errors.length){
-    resultHtml+=`<div class="sync-result-heading error-heading">Recent errors</div><ul class="sync-error-list">${errors.map(error=>`<li>${escapeHtml(error)}</li>`).join("")}</ul>`;
+    resultHtml+=`<div class="sync-result-heading error-heading">${adminSvg("alert")}<span>Recent errors</span></div><ul class="sync-error-list">${errors.map(error=>`<li>${escapeHtml(error)}</li>`).join("")}</ul>`;
   }else if(state==="completed"){
-    resultHtml+='<p class="sync-no-errors">No source errors reported in this run.</p>';
+    resultHtml+='<p class="sync-no-errors">'+adminSvg("check")+' No source errors reported in this run.</p>';
   }
   $("syncResults").innerHTML=resultHtml||'<p class="sync-result-empty">Detailed results will appear here as the process runs.</p>';
 }
@@ -75,7 +108,7 @@ $("sync").onclick = async () => {
   button.disabled=true;
   button.classList.add("is-loading");
   button.textContent="Syncing…";
-  $("syncState").textContent="In progress";
+  $("syncState").innerHTML=adminSvg("activity")+'<span>In progress</span>';
   $("syncState").className="sync-state running";
   $("syncMessage").textContent="Starting GO7 sync process…";
   $("syncProgressBar").style.width="1%";
