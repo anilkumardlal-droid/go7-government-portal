@@ -133,10 +133,26 @@
   function renderRelatedShell(){
     return '<div class="go7-related-grid"><section class="go7-related-box"><h3>Latest Posts</h3><div id="latestPosts">Loading latest updates…</div></section><section class="go7-related-box"><h3>Related Posts</h3><div id="relatedPosts">Loading related updates…</div></section></div>';
   }
+  function cleanOverview(value,title){
+    let text=String(value||"").replace(/\\s+/g," ").trim();
+    // Remove a known feed-parser prefix such as "102 | August August |" from imported summaries.
+    text=text.replace(/^\\s*\\d{1,6}\\s*\\|\\s*[A-Za-z]{3,}\\s+[A-Za-z]{3,}\\s*\\|\\s*/,"");
+    text=text.replace(/\\b([A-Za-z]{3,})\\s+\\1\\b/gi,"$1");
+    const normalize=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const cleanTitle=normalize(title),cleanText=normalize(text);
+    if(cleanText===cleanTitle)return "";
+    if(cleanTitle.length>24&&cleanText.startsWith(cleanTitle)&&cleanText.length-cleanTitle.length<32)return "";
+    return text;
+  }
+  function shareButtons(p,position){
+    const shareUrl="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
+    const title=readableTitle(p.title||"GO7 Update");
+    return '<div class="go7-share-row go7-share-'+position+'"><strong>Share this update:</strong><a href="https://api.whatsapp.com/send?text='+encodeURIComponent(title+" "+shareUrl)+'" target="_blank" rel="noopener noreferrer">WhatsApp</a><a href="https://t.me/share/url?url='+encodeURIComponent(shareUrl)+'&text='+encodeURIComponent(title)+'" target="_blank" rel="noopener noreferrer">Telegram</a></div>';
+  }
   function renderPost(p){
     const d=p.ai_details&&typeof p.ai_details==="object"?p.ai_details:{};
     const recruitment=(p.category==="jobs-vacancies"||/recruitment/i.test(String(d.notice_type||"")));
-    const overview=d.overview||p.summary||"";
+    const overview=cleanOverview(d.overview||p.summary||"",p.title);
     const normalizedOverview=String(overview).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     const normalizedTitle=String(p.title||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     const titleWords=normalizedTitle.split(" ");
@@ -150,7 +166,9 @@
     const fee=feeTable(d);
     const dateFee=(dates||fee)?'<div class="go7-two-column">'+(dates?section("Important Dates",dates,"go7-date-panel"):"")+(fee?section("Application Fee",fee,"go7-fee-panel"):"")+'</div>':"";
     const topSummary=showOverview?section(recruitment?"Recruitment Overview":"Update Overview",paragraph(overview),"go7-overview-panel"):"";
-    const ageVacancy=table(["Age Limit","Total Posts"],[[d.age_limit,d.total_vacancies]],"go7-highlight-table");
+    const ageVacancyRows=[];
+    if(present(d.age_limit)||present(d.total_vacancies))ageVacancyRows.push([d.age_limit,d.total_vacancies]);
+    const ageVacancy=table(["Age Limit","Total Posts"],ageVacancyRows,"go7-highlight-table");
     const ageVacancySection=ageVacancy?section(recruitment?"Age Limit & Total Vacancy":"Key Information",ageVacancy,"go7-highlight-section"):"";
     const eligibility=eligibilityTable(d);
     const vacancy=vacancyTable(d);
@@ -180,10 +198,12 @@
     parts.push(section("Some Useful Important Links",renderLinks(p,d),"go7-links-section"));
     parts.push(section("Source & Verification",present(d.source_evidence)?'<p>'+esc(d.source_evidence)+'</p>':(present(p.date_checked_at)?'<p>Source details last checked on '+esc(dateText(p.date_checked_at))+'. Please confirm any subsequent changes with the issuing authority.</p>':'<p>For the latest and complete information, check the original publisher and issuing authority notice.</p>'),"go7-source-section"));
     parts.push(section("Latest & Related Updates",renderRelatedShell(),"go7-related-section"));
-    const shareUrl="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
-    const share='<div class="go7-share-row"><strong>Share this update:</strong><a href="https://api.whatsapp.com/send?text='+encodeURIComponent(readableTitle(p.title||"GO7 Update")+" "+shareUrl)+'" target="_blank" rel="noopener noreferrer">WhatsApp</a><a href="https://t.me/share/url?url='+encodeURIComponent(shareUrl)+'&text='+encodeURIComponent(readableTitle(p.title||"GO7 Update"))+'" target="_blank" rel="noopener noreferrer">Telegram</a></div>';
+    const topShare=shareButtons(p,"top");
+    const bottomShare=shareButtons(p,"bottom");
     const feedback='<div class="go7-correction-box"><span>Found an error or outdated information? Share the GO7 page URL and the original official notice so we can review it.</span><a href="mailto:jobs@go7.in?subject='+encodeURIComponent("Correction request: "+(p.title||"GO7 update"))+'&body='+encodeURIComponent("GO7 page: "+shareUrl+"\nOriginal source: "+(p.source_url||"")+"\n\nCorrection details:")+'">Report a Correction</a></div>';
-    return parts.filter(Boolean).join("")+share+feedback;
+    // Share links appear both near the introduction and after the useful information, matching the reference page flow.
+    parts.splice(1,0,topShare);
+    return parts.filter(Boolean).join("")+bottomShare+feedback;
   }
   function setMeta(selector,attr,value){
     const node=document.querySelector(selector);
@@ -256,8 +276,8 @@
     $("detailCategory").textContent=p.category_label||nice(category);
     $("detailTitle").textContent=pageTitle;
     const deadline=p.application_last_date||p.ai_details?.important_dates?.last_date;
-    const status=present(deadline)?(expired(deadline)?"Application deadline passed":"Application deadline not passed"):"Check original notification for current deadline";
-    $("detailMeta").innerHTML='<span><strong>Publisher:</strong> '+esc(p.source_name||"Original publisher")+'</span><span><strong>GO7 Listed:</strong> '+esc(dateText(p.published_at||p.created_at))+'</span><span class="go7-meta-status '+(expired(deadline)?"closed":"")+'">'+esc(status)+'</span>';
+    const deadlineHtml=present(deadline)?'<span class="go7-meta-status '+(expired(deadline)?"closed":"")+'"><strong>Last Date:</strong> '+esc(dateText(deadline))+'</span>':"";
+    $("detailMeta").innerHTML='<span><strong>Publisher:</strong> '+esc(p.source_name||"Original publisher")+'</span><span><strong>GO7 Listed:</strong> '+esc(dateText(p.published_at||p.created_at))+'</span>'+deadlineHtml;
     $("detailBody").innerHTML=renderPost(p);
     $("detailContent").hidden=false;
     $("detailStatus").textContent="";
