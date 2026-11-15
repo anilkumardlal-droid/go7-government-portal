@@ -485,7 +485,8 @@ async function fetchFeed(source,env){
       "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
       "Accept":"application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
       "Accept-Language":"en-US,en;q=0.9",
-      "Cache-Control":"no-cache"
+      "Cache-Control":"no-cache",
+      "Referer":"https://www.incometaxindia.gov.in/tax-feeds"
     },
     redirect:"follow",
   },2,8000);
@@ -663,7 +664,7 @@ const OFFICIAL_MONITORS = [
     name:"West Bengal PSC Notices",
     category:"jobs-vacancies",
     parser:"table",
-    urls:["https://psc.wb.gov.in/notification_announcement.jsp","https://psc.wb.gov.in/"],
+    urls:["https://psc.wb.gov.in/whats_new.jsp","https://psc.wb.gov.in/notification_announcement.jsp","https://psc.wb.gov.in/"],
     hosts:["psc.wb.gov.in","www.psc.wb.gov.in"]
   },
   {
@@ -725,7 +726,7 @@ const OFFICIAL_MONITORS = [
     name:"Bihar School Examination Board",
     category:"admissions-education",
     parser:"education",
-    urls:["https://exam.biharboardonline.org/","https://www.biharboardonline.org/"],
+    urls:["https://exam.biharboardonline.org/home","https://exam.biharboardonline.org/","https://www.biharboardonline.org/"],
     hosts:["exam.biharboardonline.org","www.biharboardonline.org"]
   },
   {
@@ -767,7 +768,7 @@ const OFFICIAL_MONITORS = [
     name:"Odisha SAMS Admissions",
     category:"admissions-education",
     parser:"education",
-    urls:["https://degree.samsodisha.gov.in/","https://www.samsodisha.gov.in/Default.aspx"],
+    urls:["https://degree.samsodisha.gov.in/DegreeNew/DegreeNoticeDtl.aspx","https://degree.samsodisha.gov.in/","https://www.samsodisha.gov.in/Default.aspx"],
     hosts:["degree.samsodisha.gov.in","www.samsodisha.gov.in","samsodisha.gov.in"]
   },
   {
