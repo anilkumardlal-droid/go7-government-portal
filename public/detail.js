@@ -195,17 +195,30 @@
     const importantLinks=renderLinks(p,d);
     const parts=[];
     parts.push(topSummary);
-    parts.push(datesAndFee);
-    parts.push(ageVacancySection);
-    parts.push(requiredSection("Category-wise Vacancy",vacancy));
-    parts.push(requiredSection("Post-wise Eligibility",eligibility));
-    parts.push(section("Eligibility & Other Details",qualification));
-    parts.push(requiredSection("How to Apply",how));
-    parts.push(requiredSection("Selection Process",selection));
-    parts.push(section("Exam Pattern / Skill Test",exam));
-    parts.push(section("Documents Required",documents));
-    parts.push(requiredSection("FAQ",faq));
-    parts.push(requiredSection("Important Links",importantLinks,"go7-links-section"));
+    if(recruitment){
+      // Every recruitment post keeps the full checklist of sections, even when official data is missing.
+      parts.push(datesAndFee);
+      parts.push(ageVacancySection);
+      parts.push(requiredSection("Category-wise Vacancy",vacancy));
+      parts.push(requiredSection("Post-wise Eligibility",eligibility));
+      parts.push(section("Eligibility & Other Details",qualification));
+      parts.push(requiredSection("How to Apply",how));
+      parts.push(requiredSection("Selection Process",selection));
+      parts.push(section("Exam Pattern / Skill Test",exam));
+      parts.push(section("Documents Required",documents));
+      parts.push(requiredSection("FAQ",faq));
+      parts.push(requiredSection("Important Links",importantLinks,"go7-links-section"));
+    }else{
+      // Results, answer keys, admit cards and education notices only show fields relevant to that update.
+      const otherDates=rowTable(d,p);
+      if(otherDates)parts.push(section("Important Dates",otherDates));
+      if(fee)parts.push(section("Fee Details",fee));
+      parts.push(section("Update Details",qualification));
+      parts.push(section("How to Apply / Next Steps",how));
+      parts.push(section("Selection / Examination Details",selection||exam));
+      parts.push(section("FAQ",faq));
+      parts.push(section("Important Links",importantLinks,"go7-links-section"));
+    }
     parts.push(section("Source & Verification",present(d.source_evidence)?'<p>'+esc(d.source_evidence)+'</p>':(present(p.date_checked_at)?'<p>Source details last checked on '+esc(dateText(p.date_checked_at))+'. Please confirm any subsequent changes with the issuing authority.</p>':'<p>For the latest and complete information, check the original publisher and issuing authority notice.</p>'),"go7-source-section"));
     parts.push(section("Latest / Related Posts",renderRelatedShell(),"go7-related-section"));
     const topShare=shareButtons(p,"top");
