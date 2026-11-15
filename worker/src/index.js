@@ -1506,11 +1506,15 @@ async function extractNoticeWithAI(env, post, suppliedText, suppliedSourceUrl) {
   if (text.length < 300) throw new Error("Extracted notice text is too short. Please upload a readable PDF.");
   const notice = { text, finalUrl: sourceUrl, isPdf: true };
 
-  const prompt = `You extract factual recruitment information from official Indian government notifications. Use ONLY the supplied source text. Do not infer, estimate or invent facts. Return ONLY valid JSON. For every unavailable scalar field use exactly: "${MISSING}". Keep all values in English. If the notice is not a recruitment notice, set notice_type accordingly and explain briefly in overview. Return vacancy_breakdown rows, post_wise_eligibility rows and faqs only when the official source provides the facts. Do not create generic FAQs or fill gaps from memory. Schema: {"notice_type":"Recruitment|Result|Admit Card|Other","overview":"...","department":"...","post_names":["..."],"total_vacancies":"...","eligibility":"...","educational_qualification":"...","age_limit":"...","age_relaxation":"...","salary":"...","application_fee":"...","important_dates":{"notification_date":"...","start_date":"...","last_date":"...","exam_date":"...","fee_last_date":"...","correction_date":"...","admit_card_date":"...","result_date":"..."},"vacancy_breakdown":[{"category":"...","vacancies":"..."}],"post_wise_eligibility":[{"post_name":"...","educational_qualification":"...","age_limit":"...","typing_requirement":"..."}],"selection_process":["..."],"exam_pattern":["..."],"how_to_apply":["..."],"documents_required":["..."],"faqs":[{"question":"...","answer":"..."}],"official_links":[{"label":"...","url":"..."}],"source_evidence":"Briefly identify the relevant wording or section in the source."}.
+  const prompt = `You extract factual information for a published Indian government update from the supplied official source text. Use ONLY the supplied source text. Do not infer dates, fees, eligibility, vacancies, result status, or links. Never invent a fact. Return ONLY valid JSON. Keep the content in clear, concise English. The site's category is: ${clean(post.category, 80)}. The source may be a recruitment notice, result, admit card, answer key, admission notice, syllabus, or general official notice.
 
-Notice title: ${clean(post.title, 220)}
-Department/source: ${clean(post.source_name, 120)}
-Official URL: ${notice.finalUrl}
+For recruitment notices, extract as many supported details as possible: department, post names, total vacancies, category-wise vacancies, post-wise eligibility, age limit and relaxation, salary, fees, important dates, selection process, exam pattern, application steps, documents, and useful FAQs. For results, answer keys, admit cards, admissions and other notices, populate key_facts with precise label/value rows that explain what was announced, who it concerns, dates, next steps and where to check it. FAQs may be generated only when their answers are directly supported by the source facts. Do not create filler FAQs.
+
+For unavailable scalar fields use exactly: "${MISSING}". For unavailable arrays return []. Schema: {"notice_type":"Recruitment|Result|Admit Card|Answer Key|Admission|Syllabus|Important Notice|Other","overview":"A useful factual overview, not a copy of the title","department":"...","post_names":["..."],"total_vacancies":"...","eligibility":"...","educational_qualification":"...","age_limit":"...","age_relaxation":"...","salary":"...","application_fee":"...","important_dates":{"notification_date":"...","start_date":"...","last_date":"...","exam_date":"...","fee_last_date":"...","correction_date":"...","admit_card_date":"...","result_date":"..."},"vacancy_breakdown":[{"category":"...","vacancies":"..."}],"post_wise_eligibility":[{"post_name":"...","educational_qualification":"...","age_limit":"...","typing_requirement":"..."}],"selection_process":["..."],"exam_pattern":["..."],"how_to_apply":["..."],"documents_required":["..."],"key_facts":[{"label":"...","value":"..."}],"faqs":[{"question":"...","answer":"..."}],"official_links":[{"label":"...","url":"..."}],"source_evidence":"Identify the official source section supporting the extracted details."}.
+
+Post title: ${clean(post.title, 220)}
+Publisher/source: ${clean(post.source_name, 120)}
+Official source URL: ${notice.finalUrl}
 
 SOURCE TEXT (may be truncated):
 ${notice.text.slice(0, 24000)}`;
@@ -1531,7 +1535,7 @@ ${notice.text.slice(0, 24000)}`;
   const arrayFields = new Set([
     "post_names", "selection_process", "exam_pattern", "how_to_apply",
     "documents_required", "official_links", "vacancy_breakdown",
-    "post_wise_eligibility", "faqs"
+    "post_wise_eligibility", "faqs", "key_facts"
   ]);
   const allowed = [
     "notice_type", "overview", "department", "post_names",
@@ -1539,7 +1543,7 @@ ${notice.text.slice(0, 24000)}`;
     "age_limit", "age_relaxation", "salary", "application_fee",
     "important_dates", "selection_process", "exam_pattern", "how_to_apply",
     "documents_required", "official_links", "vacancy_breakdown",
-    "post_wise_eligibility", "faqs", "source_evidence"
+    "post_wise_eligibility", "faqs", "key_facts", "source_evidence"
   ];
 
   for (const key of allowed) {
@@ -1576,6 +1580,8 @@ ${notice.text.slice(0, 24000)}`;
     .filter(row => row.post_name !== MISSING && [row.educational_qualification, row.age_limit, row.typing_requirement].some(value => value !== MISSING));
   details.faqs = normalizeRows(details.faqs, ["question", "answer"])
     .filter(row => row.question !== MISSING && row.answer !== MISSING);
+  details.key_facts = normalizeRows(details.key_facts, ["label", "value"])
+    .filter(row => row.label !== MISSING && row.value !== MISSING);
   details.exam_pattern = Array.isArray(details.exam_pattern)
     ? details.exam_pattern.map(value => clean(String(value), 500)).filter(value => value && value !== MISSING).slice(0, 30)
     : [];
@@ -1593,6 +1599,37 @@ ${notice.text.slice(0, 24000)}`;
 }
 
 
+
+async function extractPostDetailsFromOfficialSource(env, post) {
+  const sourceUrl=String(post.source_url||"").trim();
+  if(!safeHttpUrl(sourceUrl))throw new Error("No valid original source URL is saved for this post.");
+  let sourceHost;
+  try{sourceHost=new URL(sourceUrl).hostname;}
+  catch{throw new Error("The saved original source URL is invalid.");}
+  if(!isOfficialHost(sourceHost))throw new Error("This post points to a non-government publisher. Add or verify its original government notice URL before extraction.");
+
+  const page=await convertOfficialDocument(env,sourceUrl);
+  let text=String(page.text||"");
+  let aiSourceUrl=page.finalUrl;
+
+  if(!page.isPdf&&page.html){
+    const pdfs=officialPdfLinks(page.html,page.finalUrl);
+    for(const pdf of pdfs.slice(0,2)){
+      try{
+        const document=await convertOfficialDocument(env,pdf.url);
+        if(document.text&&document.text.trim().length>300){
+          text=(text+"\n\nOFFICIAL NOTIFICATION PDF — "+pdf.label+"\n"+document.text).slice(0,50000);
+          aiSourceUrl=document.finalUrl;
+          break;
+        }
+      }catch(error){
+        // Keep readable official page text if an optional PDF link is temporarily unavailable.
+      }
+    }
+  }
+  if(text.trim().length<300)throw new Error("The official page/PDF did not provide enough readable text for reliable extraction.");
+  return extractNoticeWithAI(env,post,text,aiSourceUrl);
+}
 
 /* Stable, readable post slugs. Existing rows are filled lazily without deleting or rewriting content. */
 function slugify(title = "") {
@@ -1822,15 +1859,63 @@ export default {
         }
 
         if (path === "/api/admin/ai/pending" && request.method === "GET") {
-          const rows = await env.DB.prepare("SELECT id,title,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts WHERE status='published' AND category='jobs-vacancies' ORDER BY created_at DESC LIMIT 50").all();
-          return json({ items: rows.results || [] }, 200, corsOrigin);
+          const limit=Math.min(500,Math.max(1,Number(url.searchParams.get("limit")||100)));
+          const offset=Math.max(0,Number(url.searchParams.get("offset")||0));
+          const count=await env.DB.prepare(
+            "SELECT COUNT(*) AS total FROM posts WHERE status='published' AND (ai_details_json IS NULL OR ai_details_json='' OR ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source'))"
+          ).first();
+          const rows=await env.DB.prepare(
+            "SELECT id,title,summary,category,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts " +
+            "WHERE status='published' AND (ai_details_json IS NULL OR ai_details_json='' OR ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source')) " +
+            "ORDER BY COALESCE(published_at,created_at) DESC,id DESC LIMIT ? OFFSET ?"
+          ).bind(limit,offset).all();
+          return json({
+            items:rows.results||[],
+            total:Number(count?.total||0),
+            limit,
+            offset,
+            counts_by_category:(await env.DB.prepare(
+              "SELECT category,COUNT(*) AS total FROM posts WHERE status='published' AND (ai_details_json IS NULL OR ai_details_json='' OR ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source')) GROUP BY category ORDER BY total DESC"
+            ).all()).results||[]
+          },200,corsOrigin);
+        }
+
+        if(path==="/api/admin/ai/backfill-one"&&request.method==="POST"){
+          const body=await request.json();
+          const id=Number(body.id);
+          if(!Number.isSafeInteger(id)||id<1)return json({error:"A valid published post ID is required."},400,corsOrigin);
+          const post=await env.DB.prepare(
+            "SELECT id,title,summary,category,source_name,source_url,ai_extraction_status,ai_details_json FROM posts WHERE id=? AND status='published'"
+          ).bind(id).first();
+          if(!post)return json({id,status:"not_found",message:"Published post not found."},404,corsOrigin);
+          if(post.ai_extraction_status==="completed"&&post.ai_details_json){
+            return json({id,status:"already_completed",message:"This post already has extracted details."},200,corsOrigin);
+          }
+          const sourceHost=(()=>{try{return new URL(String(post.source_url||"")).hostname;}catch{return "";}})();
+          if(!isOfficialHost(sourceHost)){
+            const message="Original government source URL is missing or the saved URL belongs to a non-government publisher. This post needs its official notice URL.";
+            await env.DB.prepare("UPDATE posts SET ai_extraction_status='needs_official_source',ai_extraction_error=? WHERE id=?")
+              .bind(message,id).run();
+            return json({id,status:"needs_official_source",message},200,corsOrigin);
+          }
+          await env.DB.prepare("UPDATE posts SET ai_extraction_status='processing',ai_extraction_error=NULL WHERE id=?").bind(id).run();
+          try{
+            const extracted=await extractPostDetailsFromOfficialSource(env,post);
+            await env.DB.prepare(
+              "UPDATE posts SET ai_details_json=?,ai_extraction_status='completed',ai_extracted_at=CURRENT_TIMESTAMP,ai_extraction_error=NULL WHERE id=?"
+            ).bind(JSON.stringify(extracted.details),id).run();
+            return json({id,status:"completed",message:"Official source details extracted and saved.",source_url:extracted.sourceUrl||post.source_url},200,corsOrigin);
+          }catch(error){
+            const message=clean(error.message,500);
+            await env.DB.prepare("UPDATE posts SET ai_extraction_status='failed',ai_extraction_error=? WHERE id=?").bind(message,id).run();
+            return json({id,status:"failed",message},200,corsOrigin);
+          }
         }
 
         const extractTextMatch = path.match(/^\/api\/admin\/posts\/(\d+)\/extract-text$/);
         if (extractTextMatch && request.method === "POST") {
           const post = await env.DB.prepare("SELECT id,title,source_name,source_url,category FROM posts WHERE id=? AND status='published'").bind(Number(extractTextMatch[1])).first();
           if (!post) return json({ error: "Published post not found." }, 404, corsOrigin);
-          if (post.category !== "jobs-vacancies") return json({ error: "AI notice extraction is only enabled for Jobs & Vacancies." }, 400, corsOrigin);
           const body = await request.json();
           const text = String(body.text || "");
           const sourceUrl = String(body.source_url || post.source_url || "");
@@ -1849,7 +1934,7 @@ export default {
         }
 
         if(path==="/api/admin/ai/extract-pending"&&request.method==="POST"){
-          return json({ processed: 0, message: "PDF extraction now runs from the Admin Panel after a PDF is selected. Automatic PDF processing is disabled to prevent Worker CPU-limit errors." }, 200, corsOrigin);
+          return json({processed:0,message:"Use the Admin Panel's post-by-post backfill control. Each request processes one official source to stay within Worker CPU and request limits."},200,corsOrigin);
         }
 
         if(path==="/api/admin/health"&&request.method==="GET"){
