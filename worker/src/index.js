@@ -1059,7 +1059,7 @@ failures.push(
 }
 
 
-async function syncOfficialMonitors(db,env,dateBudget,publishedThisSyncByCategory){
+async function syncOfficialMonitors(db,env,dateBudget,publishedThisSyncByCategory,onProgress=async()=>{}){
   let inserted=0;
   let skipped=0;
   let dateChecks=0;
@@ -1086,14 +1086,40 @@ async function syncOfficialMonitors(db,env,dateBudget,publishedThisSyncByCategor
     "ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value,updated_at=CURRENT_TIMESTAMP"
   ).bind(String(nextCursor)).run();
 
-  const results=await Promise.all(monitors.map(m=>fetchOfficialMonitor(m)));
+  let fetchedCount=0;
+  const results=await Promise.all(monitors.map(async monitor=>{
+    const result=await fetchOfficialMonitor(monitor);
+    fetchedCount++;
+    await onProgress({
+      phase:"official-fetch",
+      message:`Checking official notice pages: ${fetchedCount}/${monitors.length} completed`,
+      progress:40+Math.round((fetchedCount/Math.max(1,monitors.length))*22),
+      official_checked:fetchedCount,
+      official_batch_total:monitors.length,
+      official_total:OFFICIAL_MONITORS.length,
+      current_item:monitor.name
+    });
+    return result;
+  }));
 
+  let processedCount=0;
   for(let i=0;i<monitors.length;i++){
     const monitor=monitors[i];
     const result=results[i];
     if(result.error){
       errors.push(`${monitor.name}: ${result.error}`);
       await db.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'error',CURRENT_TIMESTAMP,NULL,?) ON CONFLICT(source_name) DO UPDATE SET status='error',last_checked_at=CURRENT_TIMESTAMP,last_error=excluded.last_error").bind(monitor.name,clean(result.error,500)).run();
+      processedCount++;
+      await onProgress({
+        phase:"official-save",
+        message:`Saving official source results: ${processedCount}/${monitors.length}`,
+        progress:62+Math.round((processedCount/Math.max(1,monitors.length))*23),
+        official_processed:processedCount,
+        official_inserted:inserted,
+        official_skipped:skipped,
+        current_item:monitor.name,
+        errors:errors.slice(-8)
+      });
       continue;
     }
     await db.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'ok',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL) ON CONFLICT(source_name) DO UPDATE SET status='ok',last_checked_at=CURRENT_TIMESTAMP,last_success_at=CURRENT_TIMESTAMP,last_error=NULL").bind(monitor.name).run();
@@ -1165,6 +1191,17 @@ async function syncOfficialMonitors(db,env,dateBudget,publishedThisSyncByCategor
           .bind(publishedAt,applicationLastDate,checkedAt,evidence,existingReview.id).run();
       }
     }
+    processedCount++;
+    await onProgress({
+      phase:"official-save",
+      message:`Saving official source results: ${processedCount}/${monitors.length}`,
+      progress:62+Math.round((processedCount/Math.max(1,monitors.length))*23),
+      official_processed:processedCount,
+      official_inserted:inserted,
+      official_skipped:skipped,
+      current_item:monitor.name,
+      errors:errors.slice(-8)
+    });
   }
   return {checked:monitors.length,total:OFFICIAL_MONITORS.length,inserted,auto_published:inserted,skipped,date_checks:dateChecks,errors};
 }
@@ -1195,7 +1232,21 @@ async function ensureDefaultOfficialRssSources(db){
   }
 }
 
-async function syncAll(env){
+function createAdminSyncReporter(db,runId){
+  let state={run_id:runId,status:"running",phase:"starting",progress:0,message:"Preparing sync…",errors:[]};
+  let queue=Promise.resolve();
+  return patch=>{
+    state={...state,...patch,run_id:runId,updated_at:new Date().toISOString()};
+    const value=JSON.stringify(state);
+    queue=queue.then(()=>db.prepare(
+      "INSERT INTO sync_state(state_key,state_value) VALUES('admin_sync_status',?) " +
+      "ON CONFLICT(state_key) DO UPDATE SET state_value=excluded.state_value,updated_at=CURRENT_TIMESTAMP"
+    ).bind(value).run());
+    return queue;
+  };
+}
+
+async function syncAll(env,onProgress=async()=>{}){
   await ensureDefaultOfficialRssSources(env.DB);
   const sources=await env.DB.prepare("SELECT * FROM sources WHERE active=1").all();
   let rssInserted=0;
@@ -1203,6 +1254,20 @@ async function syncAll(env){
   const errors=[];
   const dateBudget={used:0,max:2};
   const publishedThisSyncByCategory=Object.fromEntries(CATEGORIES.map(([id])=>[id,0]));
+  const rssTotal=sources.results?.length||0;
+  let rssCompleted=0;
+  await onProgress({
+    phase:"rss",
+    message:`Checking configured RSS / Atom feeds: 0/${rssTotal}`,
+    progress:5,
+    rss_checked:0,
+    rss_total:rssTotal,
+    rss_inserted:0,
+    rss_skipped:0,
+    inserted:0,
+    skipped:0,
+    errors:[]
+  });
 
   // RSS feeds: enrich missing dates from the official item page/PDF, within a small per-sync budget.
   await Promise.all((sources.results||[]).map(async source=>{
@@ -1262,17 +1327,62 @@ async function syncAll(env){
       const message=clean(e.message,180);
       errors.push(`${source.name}: ${message}`);
       await env.DB.prepare("INSERT INTO source_health(source_name,status,last_checked_at,last_success_at,last_error) VALUES(?,'error',CURRENT_TIMESTAMP,NULL,?) ON CONFLICT(source_name) DO UPDATE SET status='error',last_checked_at=CURRENT_TIMESTAMP,last_error=excluded.last_error").bind(source.name,message).run();
+    }finally{
+      rssCompleted++;
+      await onProgress({
+        phase:"rss",
+        message:`Checking configured RSS / Atom feeds: ${rssCompleted}/${rssTotal}`,
+        progress:5+Math.round((rssCompleted/Math.max(1,rssTotal))*30),
+        rss_checked:rssCompleted,
+        rss_total:rssTotal,
+        rss_inserted:rssInserted,
+        rss_skipped:rssSkipped,
+        inserted:rssInserted,
+        skipped:rssSkipped,
+        errors:errors.slice(-8),
+        current_item:source.name
+      });
     }
   }));
 
-  let officialResult={checked:0,inserted:0,skipped:0,date_checks:0,errors:[]};
+  let officialResult={checked:0,total:OFFICIAL_MONITORS.length,inserted:0,skipped:0,date_checks:0,errors:[]};
   try{
-    officialResult=await syncOfficialMonitors(env.DB,env,dateBudget,publishedThisSyncByCategory);
+    await onProgress({
+      phase:"official-fetch",
+      message:"Starting configured official notice monitors…",
+      progress:38,
+      official_checked:0,
+      official_batch_total:Math.min(OFFICIAL_MONITOR_BATCH_SIZE,OFFICIAL_MONITORS.length),
+      official_total:OFFICIAL_MONITORS.length,
+      inserted:rssInserted,
+      skipped:rssSkipped,
+      errors:errors.slice(-8)
+    });
+    officialResult=await syncOfficialMonitors(env.DB,env,dateBudget,publishedThisSyncByCategory,async update=>{
+      await onProgress({
+        ...update,
+        inserted:rssInserted+(update.official_inserted||0),
+        skipped:rssSkipped+(update.official_skipped||0),
+        rss_inserted:rssInserted,
+        rss_skipped:rssSkipped,
+        errors:[...errors,...(update.errors||[])].slice(-8)
+      });
+    });
     errors.push(...officialResult.errors);
   }catch(e){
     errors.push("Official monitoring: "+clean(e.message,180));
   }
 
+  await onProgress({
+    phase:"finalizing",
+    message:"Preparing category totals and final sync report…",
+    progress:92,
+    inserted:rssInserted+officialResult.inserted,
+    skipped:rssSkipped+officialResult.skipped,
+    official_checked:officialResult.checked,
+    official_total:officialResult.total||OFFICIAL_MONITORS.length,
+    errors:errors.slice(-8)
+  });
   const pendingCount=await env.DB.prepare("SELECT COUNT(*) AS total FROM review_items WHERE status='pending'").first();
   const categoryRows=await env.DB.prepare(
     "SELECT category,COUNT(*) AS total FROM posts WHERE status='published' GROUP BY category"
@@ -1287,7 +1397,7 @@ async function syncAll(env){
     published_this_sync:publishedThisSyncByCategory[id]||0,
     published_total:publishedTotalByCategory[id]||0
   }));
-  return {
+  const syncResult={
     sources_checked:(sources.results?.length||0)+officialResult.checked,
     review_pending:pendingCount?.total||0,
     rss:{inserted:rssInserted,skipped:rssSkipped},
@@ -1298,6 +1408,27 @@ async function syncAll(env){
     skipped:rssSkipped+officialResult.skipped,
     errors
   };
+  await onProgress({
+    status:"completed",
+    phase:"completed",
+    progress:100,
+    message:"Sync completed successfully.",
+    finished_at:new Date().toISOString(),
+    inserted:syncResult.inserted,
+    skipped:syncResult.skipped,
+    rss_inserted:rssInserted,
+    rss_skipped:rssSkipped,
+    official_checked:officialResult.checked,
+    official_total:officialResult.total||OFFICIAL_MONITORS.length,
+    official_inserted:officialResult.inserted,
+    official_skipped:officialResult.skipped,
+    date_checks:dateBudget.used,
+    review_pending:syncResult.review_pending,
+    category_summary:categorySummary,
+    errors:errors.slice(-8),
+    result:syncResult
+  });
+  return syncResult;
 }
 
 
@@ -1607,6 +1738,13 @@ export default {
           },401,corsOrigin);
         }
 
+        if(path==="/api/admin/sync/status"&&request.method==="GET"){
+          const row=await env.DB.prepare("SELECT state_value,updated_at FROM sync_state WHERE state_key='admin_sync_status'").first();
+          let status=null;
+          try{status=row?.state_value?JSON.parse(row.state_value):null;}catch{status={status:"unknown",message:"Saved status could not be parsed."};}
+          return json({status,updated_at:row?.updated_at||null},200,corsOrigin);
+        }
+
         if (path === "/api/admin/ai/pending" && request.method === "GET") {
           const rows = await env.DB.prepare("SELECT id,title,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts WHERE status='published' AND category='jobs-vacancies' ORDER BY created_at DESC LIMIT 50").all();
           return json({ items: rows.results || [] }, 200, corsOrigin);
@@ -1703,7 +1841,37 @@ export default {
         }
 
         if(path==="/api/admin/sync"&&request.method==="POST"){
-          return json(await syncAll(env),200,corsOrigin);
+          const runId=crypto.randomUUID();
+          const report=createAdminSyncReporter(env.DB,runId);
+          await report({
+            status:"running",
+            phase:"starting",
+            progress:1,
+            message:"Starting GO7 sync process…",
+            started_at:new Date().toISOString(),
+            rss_checked:0,
+            rss_total:0,
+            official_checked:0,
+            official_batch_total:0,
+            official_total:OFFICIAL_MONITORS.length,
+            inserted:0,
+            skipped:0,
+            errors:[]
+          });
+          try{
+            const result=await syncAll(env,report);
+            return json(result,200,corsOrigin);
+          }catch(e){
+            await report({
+              status:"failed",
+              phase:"failed",
+              progress:100,
+              message:"Sync failed.",
+              error:clean(e.message,300),
+              finished_at:new Date().toISOString()
+            });
+            throw e;
+          }
         }
 
         if(path==="/api/admin/reclassify"&&request.method==="POST"){
