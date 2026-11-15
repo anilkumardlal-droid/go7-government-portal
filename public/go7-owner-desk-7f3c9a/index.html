@@ -1,14 +1,141 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>GO7 Private Console</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><script src="/config.js"></script></head>
-<body><header class="topbar"><a class="brand" href="/"><span class="brand-mark">G7</span><span>GO7 <small>ADMIN CONSOLE</small></span></a><nav><a href="/">Return to GO7</a></nav></header>
-<main class="admin-wrap">
-<section class="panel"><p class="eyebrow">PRIVATE ADMINISTRATION</p><h1>GO7 Feed Manager</h1><p class="message">Manage RSS / Atom feeds. Sync imports new posts and automatically assigns categories.</p>
-<div class="field"><label for="token">Admin token</label><input id="token" type="password" autocomplete="current-password" placeholder="Enter Worker ADMIN_TOKEN"></div>
-<div class="admin-actions"><button id="loadSources" class="secondary">Load RSS sources</button><button id="sync" class="primary">Sync RSS feeds</button><button id="reclassify" class="secondary" type="button">Categorize existing posts</button></div><p id="msg" class="message" role="status"></p></section>
-<section class="panel"><h2>Add an authorized RSS / Atom feed</h2><div class="field"><label for="name">Source name</label><input id="name" placeholder="Example: Official recruitment board"></div><div class="field"><label for="category">Default category</label><select id="category"><option value="jobs-vacancies">Jobs &amp; Vacancies</option><option value="results">Results</option><option value="admit-cards-exams">Admit Cards &amp; Exams</option><option value="answer-keys">Answer Keys</option><option value="admissions-education">Admissions &amp; Education</option><option value="important-notices">Important Notices</option></select></div><div class="field"><label for="feed">RSS / Atom feed URL</label><input id="feed" type="url" placeholder="https://publisher.gov.in/feed.xml"></div><button id="add" class="primary">Add source</button></section>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#102a50">
+<title>GO7 Admin Control Centre</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/styles.css">
+<script src="/config.js"></script>
+</head>
+<body class="admin-page">
+<header class="admin-topbar">
+  <a class="admin-brand" href="/" aria-label="GO7 home">
+    <span class="admin-brand-mark">G7</span>
+    <span class="admin-brand-text"><strong>GO7</strong><small>ADMIN CONTROL CENTRE</small></span>
+  </a>
+  <div class="admin-top-actions">
+    <span class="admin-private-label">PRIVATE WORKSPACE</span>
+    <a href="/" class="admin-return-link">← View website</a>
+  </div>
+</header>
 
-<section class="panel"><h2>Publish a verified update manually</h2><p class="message">Use this when an official site has no working RSS feed. Link only to the original official notice.</p><div class="field"><label for="postTitle">Post title</label><input id="postTitle" maxlength="220"></div><div class="field"><label for="postSummary">Short summary</label><textarea id="postSummary" rows="3" maxlength="1200"></textarea></div><div class="field"><label for="postCategory">Category</label><select id="postCategory"><option value="jobs-vacancies">Jobs &amp; Vacancies</option><option value="results">Results</option><option value="admit-cards-exams">Admit Cards &amp; Exams</option><option value="answer-keys">Answer Keys</option><option value="admissions-education">Admissions &amp; Education</option><option value="important-notices">Important Notices</option></select></div><div class="field"><label for="postSource">Department / source name</label><input id="postSource" value="Official Department"></div><div class="field"><label for="postUrl">Official notice URL</label><input id="postUrl" type="url" placeholder="https://department.gov.in/notice"></div><div class="field"><label for="postPublished">Official publication date</label><input id="postPublished" type="date"></div><div class="field"><label for="postDeadline">Application last date (if applicable)</label><input id="postDeadline" type="date"></div><button id="publishPost" class="primary">Publish update</button></section>
-<section class="panel"><h2>AI Notice Extraction (PDF)</h2><p class="message">Latest Jobs की official PDF चुनें। PDF आपके browser में पढ़ी जाएगी; Worker को केवल निकाला गया text भेजा जाएगा। Scanned/image-only PDF समर्थित नहीं है।</p><button id="loadAiPosts" class="secondary" type="button">Load Latest Jobs</button><div id="aiPosts" class="message">Not loaded.</div><div class="field"><label for="aiPostId">Selected Post ID</label><input id="aiPostId" inputmode="numeric" placeholder="ऊपर सूची से पोस्ट चुनें"></div><div class="field"><label for="aiPdf">Official notification PDF</label><input id="aiPdf" type="file" accept="application/pdf,.pdf"></div><button id="runAiExtract" class="primary" type="button">Read PDF & Extract Details</button><p id="aiStatus" class="message" role="status"></p></section>
-<section class="panel"><h2>Automatic official notice publishing</h2><p class="message">Automatic publishing is enabled for new notices found on GO7’s configured official government monitors. Verified notices publish without an approval step. Notices collected before this change remain unpublished until the same notice is found again on its official source.</p><button id="loadReview" class="secondary" type="button">Show older pending notices</button><div id="review" class="message">Automatic publishing is enabled. No approval is required for newly detected official notices.</div></section>
-<section class="panel"><h2>Source health & recent errors</h2><button id="loadHealth" class="secondary" type="button">Check source health</button><div id="health" class="message">Not loaded.</div></section>
-<section class="panel"><h2>Configured RSS / Atom sources</h2><div id="sources" class="message">Not loaded.</div></section>
-</main><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script><script src="/admin.js"></script><script src="/site.js"></script></body></html>
+<main class="admin-wrap admin-dashboard">
+  <section class="panel admin-hero">
+    <div class="admin-hero-copy">
+      <p class="eyebrow">GO7 OPERATIONS</p>
+      <h1>Control centre</h1>
+      <p>Manage trusted feeds, publish verified updates, review source health and monitor automated government notice checks.</p>
+    </div>
+    <div class="admin-auth-area">
+      <div class="field">
+        <label for="token">Admin token</label>
+        <input id="token" type="password" autocomplete="current-password" placeholder="Enter Worker ADMIN_TOKEN">
+      </div>
+      <div class="admin-actions">
+        <button id="loadSources" class="secondary" type="button">Load RSS sources</button>
+        <button id="sync" class="primary" type="button">Sync RSS feeds</button>
+        <button id="reclassify" class="secondary" type="button">Categorize existing posts</button>
+      </div>
+      <p id="msg" class="message admin-message" role="status">Enter your admin token to manage the portal.</p>
+    </div>
+  </section>
+
+  <section class="panel process-panel" aria-labelledby="processTitle" aria-live="polite">
+    <div class="process-heading">
+      <div>
+        <p class="eyebrow">LIVE ACTIVITY</p>
+        <h2 id="processTitle">Sync process monitor</h2>
+        <p class="process-subtitle">Live progress from the Worker while RSS feeds and official notice pages are checked.</p>
+      </div>
+      <span id="syncState" class="sync-state idle">Idle</span>
+    </div>
+    <div class="sync-progress-row">
+      <div class="sync-progress-track" role="progressbar" aria-label="Sync progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span id="syncProgressBar"></span>
+      </div>
+      <strong id="syncPercent">0%</strong>
+    </div>
+    <p id="syncMessage" class="sync-message">No sync process has been recorded yet.</p>
+    <p id="syncCurrent" class="sync-current"></p>
+    <div id="syncStats" class="sync-stats">
+      <div class="sync-stat"><strong>0/0</strong><span>RSS feeds</span></div>
+      <div class="sync-stat"><strong>0/0</strong><span>Official checks</span></div>
+      <div class="sync-stat"><strong>0</strong><span>New posts</span></div>
+      <div class="sync-stat"><strong>0</strong><span>Skipped / existing</span></div>
+      <div class="sync-stat"><strong>0</strong><span>Date checks</span></div>
+      <div class="sync-stat"><strong>0</strong><span>Errors</span></div>
+    </div>
+    <div id="syncResults" class="sync-results">
+      <p class="sync-result-empty">Category totals and errors will appear here after the sync starts.</p>
+    </div>
+    <div class="process-actions">
+      <button id="refreshSyncStatus" class="secondary" type="button">Refresh latest process</button>
+    </div>
+  </section>
+
+  <section class="panel admin-card">
+    <p class="eyebrow">SOURCES</p>
+    <h2>Add an authorized RSS / Atom feed</h2>
+    <div class="field"><label for="name">Source name</label><input id="name" placeholder="Example: Official recruitment board"></div>
+    <div class="field"><label for="category">Default category</label><select id="category"><option value="jobs-vacancies">Jobs &amp; Vacancies</option><option value="results">Results</option><option value="admit-cards-exams">Admit Cards &amp; Exams</option><option value="answer-keys">Answer Keys</option><option value="admissions-education">Admissions &amp; Education</option><option value="important-notices">Important Notices</option></select></div>
+    <div class="field"><label for="feed">RSS / Atom feed URL</label><input id="feed" type="url" placeholder="https://publisher.gov.in/feed.xml"></div>
+    <button id="add" class="primary" type="button">Add source</button>
+  </section>
+
+  <section class="panel admin-card">
+    <p class="eyebrow">EDITORIAL PUBLISHING</p>
+    <h2>Publish a verified update manually</h2>
+    <p class="message">Use this when an official site has no working RSS feed. Link only to the original official notice.</p>
+    <div class="field"><label for="postTitle">Post title</label><input id="postTitle" maxlength="220"></div>
+    <div class="field"><label for="postSummary">Short summary</label><textarea id="postSummary" rows="3" maxlength="1200"></textarea></div>
+    <div class="field"><label for="postCategory">Category</label><select id="postCategory"><option value="jobs-vacancies">Jobs &amp; Vacancies</option><option value="results">Results</option><option value="admit-cards-exams">Admit Cards &amp; Exams</option><option value="answer-keys">Answer Keys</option><option value="admissions-education">Admissions &amp; Education</option><option value="important-notices">Important Notices</option></select></div>
+    <div class="field"><label for="postSource">Department / source name</label><input id="postSource" value="Official Department"></div>
+    <div class="field"><label for="postUrl">Official notice URL</label><input id="postUrl" type="url" placeholder="https://department.gov.in/notice"></div>
+    <div class="field"><label for="postPublished">Official publication date</label><input id="postPublished" type="date"></div>
+    <div class="field"><label for="postDeadline">Application last date (if applicable)</label><input id="postDeadline" type="date"></div>
+    <button id="publishPost" class="primary" type="button">Publish update</button>
+  </section>
+
+  <section class="panel admin-card">
+    <p class="eyebrow">DOCUMENT ASSISTANCE</p>
+    <h2>AI Notice Extraction (PDF)</h2>
+    <p class="message">Select an official Jobs &amp; Vacancies PDF. The PDF is read in your browser; only extracted text is sent to the Worker. Scanned / image-only PDFs are not supported.</p>
+    <button id="loadAiPosts" class="secondary" type="button">Load Latest Jobs</button>
+    <div id="aiPosts" class="message">Not loaded.</div>
+    <div class="field"><label for="aiPostId">Selected Post ID</label><input id="aiPostId" inputmode="numeric" placeholder="Select a post from the list"></div>
+    <div class="field"><label for="aiPdf">Official notification PDF</label><input id="aiPdf" type="file" accept="application/pdf,.pdf"></div>
+    <button id="runAiExtract" class="primary" type="button">Read PDF &amp; Extract Details</button>
+    <p id="aiStatus" class="message" role="status"></p>
+  </section>
+
+  <section class="panel admin-card">
+    <p class="eyebrow">AUTOMATION</p>
+    <h2>Automatic official notice publishing</h2>
+    <p class="message">Automatic publishing is enabled for new notices found on GO7’s configured official government monitors. Verified notices publish without an approval step. Notices collected before this change remain unpublished until the same notice is found again on its official source.</p>
+    <button id="loadReview" class="secondary" type="button">Show older pending notices</button>
+    <div id="review" class="message">Automatic publishing is enabled. No approval is required for newly detected official notices.</div>
+  </section>
+
+  <section class="panel admin-card">
+    <p class="eyebrow">MONITORING</p>
+    <h2>Source health &amp; recent errors</h2>
+    <button id="loadHealth" class="secondary" type="button">Check source health</button>
+    <div id="health" class="message">Not loaded.</div>
+  </section>
+
+  <section class="panel admin-card admin-card-wide">
+    <p class="eyebrow">CONFIGURATION</p>
+    <h2>Configured RSS / Atom sources</h2>
+    <div id="sources" class="message">Not loaded.</div>
+  </section>
+</main>
+
+<footer class="admin-footer"><span>GO7 · Independent information service</span><a href="/">Return to Jobs GO7</a></footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+<script src="/admin.js?v=go7-admin-live-20261115"></script>
+<script src="/site.js"></script>
+</body>
+</html>
