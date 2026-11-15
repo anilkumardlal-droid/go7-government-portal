@@ -101,6 +101,10 @@ jobs:
 
           worker_js = (worker / "src/index.js").read_text(encoding="utf-8")
           assert "createAdminSyncReporter" in worker_js and "admin_sync_status" in worker_js, "D1-backed admin progress reporter is missing"
+          assert "HINDI_RECRUITMENT_RE" in worker_js and "HINDI_EDUCATION_RE" in worker_js, "Hindi official notice parsing is missing"
+          assert "let reachableUrl=null" in worker_js and "no_matches:Boolean(reachableUrl)" in worker_js, "Reachable sources with no matching notices must not be reported as network errors"
+          assert 'urls:["https://nta.ac.in/NoticeBoardArchive","https://www.nta.ac.in/NoticeBoardArchive"]' in worker_js, "NTA canonical hostname fallback is missing"
+          assert 'GO7GovernmentUpdates/1.0' in worker_js, "Official source fetch user-agent is missing"
           assert 'if(path==="/api/admin/sync/status"&&request.method==="GET")' in worker_js, "Authenticated sync status endpoint is missing"
           assert 'createAdminSyncReporter(env.DB,runId,"scheduled_sync_status")' in worker_js, "Automatic Cron progress reporting is missing"
           assert 'trigger:"automatic"' in worker_js and 'trigger:"manual"' in worker_js, "Manual/automatic sync source labels are missing"
