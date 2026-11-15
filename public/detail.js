@@ -64,26 +64,24 @@
     exam_date:"Examination Date",fee_last_date:"Fee Payment Last Date",correction_date:"Correction Window",
     admit_card_date:"Admit Card Date",result_date:"Result Date"
   };
-  const section=(title,body,cls="")=>body?'<section class="go7-post-section '+cls+'"><h2>'+esc(title)+'</h2>'+body+'</section>':"";
+  const section=(title,body,cls="")=>body?'<section class="go7-post-section '+cls+'"><table class="go7-section-table"><thead><tr><th colspan="2"><h2>'+esc(title)+'</h2></th></tr></thead><tbody><tr><td colspan="2">'+body+'</td></tr></tbody></table></section>':"";
   const noticeMissing='<p class="go7-notice-missing">This detail is not mentioned in the official information currently available to GO7. Please check the original notification.</p>';
   const requiredSection=(title,body,cls="")=>section(title,present(body)?body:noticeMissing,cls);
   function renderDatesAndFee(d,p){
     const dateContent=rowTable(d,p);
     const feeContent=feeTable(d);
-    const datePanel='<div class="go7-required-panel"><h3>Important Dates</h3>'+(present(dateContent)?dateContent:noticeMissing)+'</div>';
-    const feePanel='<div class="go7-required-panel"><h3>Application Fee</h3>'+(present(feeContent)?feeContent:noticeMissing)+'</div>';
-    return section("Important Dates + Fee",'<div class="go7-required-two-panel">'+datePanel+feePanel+'</div>');
+    const panel=(title,content)=>'<div class="go7-required-panel"><table class="go7-subsection-table"><thead><tr><th colspan="2">'+esc(title)+'</th></tr></thead><tbody><tr><td colspan="2">'+(present(content)?content:noticeMissing)+'</td></tr></tbody></table></div>';
+    return section("Important Dates + Fee",'<div class="go7-required-two-panel">'+panel("Important Dates",dateContent)+panel("Application Fee",feeContent)+'</div>');
   }
   function table(headers,rows,cls=""){
     const valid=(rows||[]).filter(row=>Array.isArray(row)&&row.some(present));
     if(!valid.length)return "";
     return '<div class="go7-table-scroll"><table class="go7-info-table '+cls+'"><thead><tr>'+headers.map(h=>'<th scope="col">'+esc(h)+'</th>').join("")+'</tr></thead><tbody>'+valid.map(row=>'<tr>'+row.map(cell=>'<td>'+esc(present(cell)?(Array.isArray(cell)?cell.filter(present).join(", "):cell):"—")+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>';
   }
-  function bullets(values,ordered){
+  function bullets(values,ordered,label){
     const items=list(values).map(v=>typeof v==="object"?(v.label||v.name||v.value||""):v).filter(present);
     if(!items.length)return "";
-    const tag=ordered?"ol":"ul";
-    return '<'+tag+' class="go7-post-bullets">'+items.map(v=>'<li>'+esc(v)+'</li>').join("")+'</'+tag+'>';
+    return table([label|| (ordered?"Step":"Stage"),"Details"],items.map((value,index)=>[(ordered?"Step ":"Stage ")+(index+1),value]));
   }
   function paragraph(value){
     if(!present(value))return "";
@@ -105,8 +103,11 @@
   function feeTable(d){
     if(!present(d.application_fee))return "";
     const feeItems=String(d.application_fee).split(/\r?\n+/).map(x=>x.trim()).filter(Boolean);
-    if(feeItems.length>1)return '<div class="go7-fee-list">'+bullets(feeItems,false)+'</div>';
-    return '<div class="go7-fee-list">'+paragraph(d.application_fee)+'</div>';
+    const rows=feeItems.map((item,index)=>{
+      const match=item.replace(/^[-•*]\s*/,"").match(/^(.{2,70}?)(?:\s*[:：–—-]\s+)(.+)$/);
+      return match?[match[1].replace(/\*\*/g,""),match[2].replace(/\*\*/g,"")]:["Fee Detail "+(index+1),item.replace(/\*\*/g,"")];
+    });
+    return table(["Fee Category","Amount / Details"],rows);
   }
   function vacancyTable(d){
     const rows=list(d.vacancy_breakdown).filter(r=>present(r.category||r.category_name)&&present(r.vacancies||r.posts||r.total||r.count))
@@ -115,8 +116,12 @@
   }
   function eligibilityTable(d){
     const rows=list(d.post_wise_eligibility).filter(r=>present(r.post_name||r.post||r.name))
-      .map(r=>[r.post_name||r.post||r.name,r.educational_qualification||r.qualification,r.age_limit,r.typing_requirement||r.skill_requirement]);
-    return table(["Post Name","Educational Qualification","Age Limit","Typing / Skill Requirement"],rows);
+      .map(r=>[
+        r.post_name||r.post||r.name,
+        [r.educational_qualification||r.qualification,r.age_limit,r.typing_requirement||r.skill_requirement]
+          .filter(present).join(" · ")
+      ]);
+    return table(["Post Name","Eligibility Details"],rows);
   }
   function renderLinks(p,d){
     const links=[],primary=urlSafe(p.source_url);
@@ -137,7 +142,7 @@
   function renderFaq(d){
     const faqs=list(d.faqs&&d.faqs.length?d.faqs:d.faq).filter(x=>x&&present(x.question)&&present(x.answer));
     if(!faqs.length)return "";
-    return table(["Question","Answer"],faqs.map(x=>[x.question,x.answer]),"go7-faq-table");
+    return table(["Frequently Asked Question","Answer"],faqs.map(x=>[x.question,x.answer]),"go7-faq-table");
   }
   function renderRelatedShell(){
     return '<div class="go7-related-grid"><section class="go7-related-box"><h3>Latest Posts</h3><div id="latestPosts">Loading latest updates…</div></section><section class="go7-related-box"><h3>Related Posts</h3><div id="relatedPosts">Loading related updates…</div></section></div>';
@@ -187,10 +192,10 @@
       ["Salary / Pay Scale",d.salary]
     ].filter(([,value])=>present(value));
     const qualification=table(["Eligibility Details","Information"],qualificationRows);
-    const selection=bullets(d.selection_process,false);
-    const exam=bullets(d.exam_pattern,false);
-    const how=bullets(d.how_to_apply,true);
-    const documents=bullets(d.documents_required,false);
+    const selection=bullets(d.selection_process,false,"Selection Stage");
+    const exam=bullets(d.exam_pattern,false,"Exam / Skill Test");
+    const how=bullets(d.how_to_apply,true,"Application Step");
+    const documents=bullets(d.documents_required,false,"Document");
     const faq=renderFaq(d);
     const importantLinks=renderLinks(p,d);
     const parts=[];
@@ -219,7 +224,12 @@
       parts.push(section("FAQ",faq));
       parts.push(section("Important Links",importantLinks,"go7-links-section"));
     }
-    parts.push(section("Source & Verification",present(d.source_evidence)?'<p>'+esc(d.source_evidence)+'</p>':(present(p.date_checked_at)?'<p>Source details last checked on '+esc(dateText(p.date_checked_at))+'. Please confirm any subsequent changes with the issuing authority.</p>':'<p>For the latest and complete information, check the original publisher and issuing authority notice.</p>'),"go7-source-section"));
+    const sourceRows=[
+      ["Publisher",p.source_name||"Original publisher"],
+      ["Last Checked",present(p.date_checked_at)?dateText(p.date_checked_at):"Please verify current details against the latest original notification."],
+      ["Verification Note",d.source_evidence]
+    ].filter(([,value])=>present(value));
+    parts.push(section("Source & Verification",table(["Source Detail","Information"],sourceRows),"go7-source-section"));
     parts.push(section("Latest / Related Posts",renderRelatedShell(),"go7-related-section"));
     const topShare=shareButtons(p,"top");
     const bottomShare=shareButtons(p,"bottom");
