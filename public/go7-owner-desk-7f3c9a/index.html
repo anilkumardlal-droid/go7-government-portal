@@ -12,9 +12,9 @@
 </head>
 <body class="admin-page">
 <header class="admin-topbar">
-  <a class="admin-brand" href="/" aria-label="GO7 home">
-    <span class="admin-brand-mark">G7</span>
-    <span class="admin-brand-text"><strong>GO7</strong><small>ADMIN CONTROL CENTRE</small></span>
+  <a class="admin-brand" href="/" aria-label="Jobs GO7 home">
+    <img class="admin-brand-logo" src="/assets/jobs-go7-color.webp" alt="Jobs GO7">
+    <span class="admin-brand-context">ADMIN CONTROL CENTRE</span>
   </a>
   <div class="admin-top-actions">
     <span class="admin-private-label">PRIVATE WORKSPACE</span>
@@ -61,24 +61,25 @@
     <p id="syncMessage" class="sync-message">No sync process has been recorded yet.</p>
     <p id="syncCurrent" class="sync-current"></p>
     <div id="syncStats" class="sync-stats">
-      <div class="sync-stat"><strong>0/0</strong><span>RSS feeds</span></div>
-      <div class="sync-stat"><strong>0/0</strong><span>Official checks</span></div>
-      <div class="sync-stat"><strong>0</strong><span>New posts</span></div>
-      <div class="sync-stat"><strong>0</strong><span>Skipped / existing</span></div>
-      <div class="sync-stat"><strong>0</strong><span>Date checks</span></div>
-      <div class="sync-stat"><strong>0</strong><span>Errors</span></div>
+      <div class="sync-stat"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 19a2 2 0 1 0 0 .01"/><path d="M5 12a7 7 0 0 1 7 7"/><path d="M5 5a14 14 0 0 1 14 14"/></svg><strong>0/0</strong><span>RSS feeds</span></div>
+      <div class="sync-stat"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg><strong>0/0</strong><span>Official checks</span></div>
+      <div class="sync-stat"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg><strong>0</strong><span>New posts</span></div>
+      <div class="sync-stat"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 4 10 8L5 20zM19 5v14"/></svg><strong>0</strong><span>Skipped / existing</span></div>
+      <div class="sync-stat"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><strong>0</strong><span>Date checks</span></div>
+      <div class="sync-stat"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg><strong>0</strong><span>Errors</span></div>
     </div>
+    <div class="sync-results-heading"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-5 5"/></svg><span>Live results</span></div>
     <div id="syncResults" class="sync-results">
       <p class="sync-result-empty">Category totals and errors will appear here after the sync starts.</p>
     </div>
     <div class="process-actions">
-      <button id="refreshSyncStatus" class="secondary" type="button">Refresh latest process</button>
+      <button id="refreshSyncStatus" class="secondary admin-button-icon" type="button"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/></svg><span>Refresh latest process</span></button>
     </div>
   </section>
 
   <section class="panel admin-card">
     <p class="eyebrow">SOURCES</p>
-    <h2>Add an authorized RSS / Atom feed</h2>
+    <h2 class="admin-title-with-icon"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 19a2 2 0 1 0 0 .01"/><path d="M5 12a7 7 0 0 1 7 7"/><path d="M5 5a14 14 0 0 1 14 14"/></svg><span>Add an authorized RSS / Atom feed</span></h2>
     <div class="field"><label for="name">Source name</label><input id="name" placeholder="Example: Official recruitment board"></div>
     <div class="field"><label for="category">Default category</label><select id="category"><option value="jobs-vacancies">Jobs &amp; Vacancies</option><option value="results">Results</option><option value="admit-cards-exams">Admit Cards &amp; Exams</option><option value="answer-keys">Answer Keys</option><option value="admissions-education">Admissions &amp; Education</option><option value="important-notices">Important Notices</option></select></div>
     <div class="field"><label for="feed">RSS / Atom feed URL</label><input id="feed" type="url" placeholder="https://publisher.gov.in/feed.xml"></div>
@@ -87,7 +88,7 @@
 
   <section class="panel admin-card">
     <p class="eyebrow">EDITORIAL PUBLISHING</p>
-    <h2>Publish a verified update manually</h2>
+    <h2 class="admin-title-with-icon"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/></svg><span>Publish a verified update manually</span></h2>
     <p class="message">Use this when an official site has no working RSS feed. Link only to the original official notice.</p>
     <div class="field"><label for="postTitle">Post title</label><input id="postTitle" maxlength="220"></div>
     <div class="field"><label for="postSummary">Short summary</label><textarea id="postSummary" rows="3" maxlength="1200"></textarea></div>
@@ -101,7 +102,7 @@
 
   <section class="panel admin-card">
     <p class="eyebrow">DOCUMENT ASSISTANCE</p>
-    <h2>AI Notice Extraction (PDF)</h2>
+    <h2 class="admin-title-with-icon"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 16.2A4.5 4.5 0 0 0 18 7.5a6 6 0 0 0-11.6 1.7A4 4 0 0 0 7 17h11"/></svg><span>AI Notice Extraction (PDF)</span></h2>
     <p class="message">Select an official Jobs &amp; Vacancies PDF. The PDF is read in your browser; only extracted text is sent to the Worker. Scanned / image-only PDFs are not supported.</p>
     <button id="loadAiPosts" class="secondary" type="button">Load Latest Jobs</button>
     <div id="aiPosts" class="message">Not loaded.</div>
@@ -113,7 +114,7 @@
 
   <section class="panel admin-card">
     <p class="eyebrow">AUTOMATION</p>
-    <h2>Automatic official notice publishing</h2>
+    <h2 class="admin-title-with-icon"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg><span>Automatic official notice publishing</span></h2>
     <p class="message">Automatic publishing is enabled for new notices found on GO7’s configured official government monitors. Verified notices publish without an approval step. Notices collected before this change remain unpublished until the same notice is found again on its official source.</p>
     <button id="loadReview" class="secondary" type="button">Show older pending notices</button>
     <div id="review" class="message">Automatic publishing is enabled. No approval is required for newly detected official notices.</div>
@@ -121,14 +122,14 @@
 
   <section class="panel admin-card">
     <p class="eyebrow">MONITORING</p>
-    <h2>Source health &amp; recent errors</h2>
+    <h2 class="admin-title-with-icon"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Source health &amp; recent errors</span></h2>
     <button id="loadHealth" class="secondary" type="button">Check source health</button>
     <div id="health" class="message">Not loaded.</div>
   </section>
 
   <section class="panel admin-card admin-card-wide">
     <p class="eyebrow">CONFIGURATION</p>
-    <h2>Configured RSS / Atom sources</h2>
+    <h2 class="admin-title-with-icon"><svg class="admin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Configured RSS / Atom sources</span></h2>
     <div id="sources" class="message">Not loaded.</div>
   </section>
 </main>
