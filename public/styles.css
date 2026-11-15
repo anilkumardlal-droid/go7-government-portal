@@ -1105,3 +1105,52 @@ body.admin-page{
  .go7-required-two-panel{grid-template-columns:1fr}
  .go7-required-panel+.go7-required-panel{border-left:0;border-top:1px solid #c5ccd5}
 }
+
+/* Unified premium two-column tables: section title row + label/details rows */
+.go7-post-section{margin:0 0 16px;padding:0;border:0;background:transparent}
+.go7-section-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;border:1px solid #cbd5e1;border-radius:7px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(16,42,80,.045)}
+.go7-section-table>thead>tr>th{padding:11px 14px;background:#102a50;color:#fff;text-align:left;border:0}
+.go7-section-table>thead>tr>th h2{margin:0;padding:0;border:0;background:transparent;color:#fff;text-align:left;font-family:inherit;font-size:16px;font-weight:700;line-height:1.4;letter-spacing:0}
+.go7-section-table>tbody>tr>td{padding:0;border:0;background:#fff;vertical-align:top}
+.go7-info-table{width:100%;border-collapse:collapse;table-layout:auto;font-family:inherit;font-size:14px;color:#172437}
+.go7-info-table th,.go7-info-table td{padding:10px 12px;border:1px solid #d7dee8;text-align:left;vertical-align:top;font-size:14px;line-height:1.55;font-weight:400}
+.go7-info-table thead th{background:#edf2f8;color:#102a50;text-align:left;font-weight:700}
+.go7-info-table tbody tr:nth-child(even) td,.go7-info-table tbody tr:nth-child(even) th{background:#f8fafc}
+.go7-info-table tbody th{width:32%;background:#f1f5f9;color:#243b5b;font-weight:700}
+.go7-info-table td{color:#26374e}
+.go7-info-table a{font-size:14px;font-weight:700}
+.go7-required-two-panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.go7-required-panel{min-width:0}
+.go7-required-panel+.go7-required-panel{border-left:1px solid #d7dee8}
+.go7-subsection-table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed}
+.go7-subsection-table thead th{padding:9px 11px;background:#edf2f8;color:#102a50;text-align:center;border:1px solid #d7dee8;font-size:14px;font-weight:700}
+.go7-subsection-table tbody td{padding:0;border:1px solid #d7dee8;vertical-align:top}
+.go7-notice-missing{margin:0;padding:11px 13px;color:#526176;font-size:14px;line-height:1.6}
+.go7-post-section p,.go7-overview-panel p,.go7-source-section p{margin:0;padding:12px 13px;color:#26374e;font-size:14px;line-height:1.65}
+.go7-post-bullets{margin:0;padding:8px 12px 8px 32px;color:#26374e}
+.go7-post-bullets li{padding:5px 4px;font-size:14px;line-height:1.6}
+.go7-share-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:13px 0;font-size:14px}
+.go7-share-row strong{font-size:14px;font-weight:700}
+.go7-share-row a{padding:8px 13px;font-size:14px}
+.go7-related-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:0}
+.go7-related-box{min-width:0;padding:0;background:#fff}
+.go7-related-box+.go7-related-box{border-left:1px solid #d7dee8}
+.go7-related-box h3{margin:0;padding:9px 12px;border-bottom:1px solid #d7dee8;background:#edf2f8;color:#102a50;font-size:14px;font-weight:700}
+.go7-related-list{margin:0;padding:0 12px;list-style:none}
+.go7-related-list li{padding:9px 0;border-bottom:1px solid #edf0f4}
+.go7-related-list a{display:block;color:#003f9e;font-size:14px;line-height:1.5;font-weight:600;text-decoration:underline;overflow-wrap:anywhere}
+.go7-related-list small{display:block;margin-top:3px;color:#66758b;font-size:14px}
+.go7-correction-box{font-size:14px;line-height:1.6}
+.go7-correction-box a{font-size:14px}
+.go7-post-heading h1{font-size:25px;font-weight:600;line-height:1.4;text-transform:none}
+@media(max-width:760px){
+ .go7-section-table>thead>tr>th{padding:10px 11px}
+ .go7-section-table>thead>tr>th h2{font-size:15px}
+ .go7-info-table th,.go7-info-table td{padding:9px 10px;font-size:14px}
+ .go7-required-two-panel{grid-template-columns:1fr}
+ .go7-required-panel+.go7-required-panel{border-left:0;border-top:1px solid #d7dee8}
+ .go7-related-grid{grid-template-columns:1fr}
+ .go7-related-box+.go7-related-box{border-left:0;border-top:1px solid #d7dee8}
+ .go7-post-section p,.go7-notice-missing,.go7-post-bullets li,.go7-related-list a,.go7-related-list small{font-size:14px}
+ .go7-share-row,.go7-share-row strong,.go7-share-row a{font-size:14px}
+}
