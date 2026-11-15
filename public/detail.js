@@ -144,6 +144,10 @@
     if(!faqs.length)return "";
     return table(["Frequently Asked Question","Answer"],faqs.map(x=>[x.question,x.answer]),"go7-faq-table");
   }
+  function renderKeyFacts(d){
+    const rows=list(d.key_facts).filter(x=>x&&present(x.label)&&present(x.value)).map(x=>[x.label,x.value]);
+    return table(["Information","Details"],rows);
+  }
   function renderRelatedShell(){
     return '<div class="go7-related-grid"><section class="go7-related-box"><h3>Latest Posts</h3><div id="latestPosts">Loading latest updates…</div></section><section class="go7-related-box"><h3>Related Posts</h3><div id="relatedPosts">Loading related updates…</div></section></div>';
   }
@@ -218,7 +222,7 @@
       const otherDates=rowTable(d,p);
       if(otherDates)parts.push(section("Important Dates",otherDates));
       if(fee)parts.push(section("Fee Details",fee));
-      parts.push(section("Update Details",qualification));
+      parts.push(requiredSection("Update Details",renderKeyFacts(d)||qualification));
       parts.push(section("How to Apply / Next Steps",how));
       parts.push(section("Selection / Examination Details",selection||exam));
       parts.push(section("FAQ",faq));
