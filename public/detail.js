@@ -112,15 +112,12 @@
       links.push({label:item.label||"Official Notification / Website",url:href});
     }
     const linkMarkup=links.length?'<div class="detail-link-list">'+links.map(item=>'<a class="detail-action-link '+(item.primary?'primary':'')+'" href="'+esc(item.url)+'" target="_blank" rel="noopener noreferrer">'+esc(item.label)+' <span aria-hidden="true">↗</span></a>').join("")+'</div><p class="detail-small-note">Please confirm the latest notice and application details on the issuing authority’s website.</p>':'<p>Source links have not been added to this listing yet.</p>';
-    const sourceName=p.source_name||d.department||"Original publisher";
-    const evidenceMarkup='<div class="detail-source-card"><div><span class="detail-source-label">Publisher</span><strong>'+esc(sourceName)+'</strong></div><div><span class="detail-source-label">Date check</span><strong>'+(hasValue(p.date_checked_at)?'Checked on '+esc(dateLabel(p.date_checked_at)):'Check current details in the original notice')+'</strong></div>'+(hasValue(d.source_evidence)?'<p>'+esc(d.source_evidence)+'</p>':"")+'</div>';
+    const evidenceMarkup='<div class="detail-source-card"><div><span class="detail-source-label">Date check</span><strong>'+(hasValue(p.date_checked_at)?'Checked on '+esc(dateLabel(p.date_checked_at)):'Check current details in the original notice')+'</strong></div>'+(hasValue(d.source_evidence)?'<p>'+esc(d.source_evidence)+'</p>':"")+'</div>';
     const facts=[
       {label:"Department / Publisher",value:d.department||p.source_name},
       {label:"Total Vacancies",value:d.total_vacancies},
-      {label:"Application Last Date",value:hasValue(deadline)?dateLabel(deadline):""},
       {label:"Age Limit",value:d.age_limit},
-      {label:"Application Fee",value:d.application_fee},
-      {label:"Salary / Pay Scale",value:d.salary}
+      {label:"Application Fee",value:d.application_fee}
     ];
     const statusMarkup=hasValue(deadline)?'<p class="detail-deadline '+(isExpired(deadline)?"closed":"open")+'">'+(isExpired(deadline)?"Application deadline has passed":"Application deadline has not passed")+'</p>':'<p class="detail-deadline unknown">Check the original notice for the current application deadline.</p>';
     const sidebar=[
@@ -192,7 +189,7 @@
     $("detailTitle").textContent=post.title||"Government Update";
     const deadline=post.application_last_date||post.ai_details?.important_dates?.last_date||"";
     const deadlineState=hasValue(deadline)?(isExpired(deadline)?"Deadline passed":"Deadline not passed"):"Check original notification";
-    $("detailMeta").innerHTML='<span><strong>Publisher:</strong> '+esc(post.source_name||"Original publisher")+'</span><span><strong>Listed:</strong> '+esc(dateLabel(post.published_at||post.created_at))+'</span><span><strong>Last date:</strong> '+esc(dateLabel(deadline))+'</span><span class="detail-status-pill '+(isExpired(deadline)?'closed':'')+'">'+esc(deadlineState)+'</span>';
+    $("detailMeta").innerHTML='<span><strong>Publisher:</strong> '+esc(post.source_name||"Original publisher")+'</span><span><strong>Listed:</strong> '+esc(dateLabel(post.published_at||post.created_at))+'</span><span class="detail-status-pill '+(isExpired(deadline)?'closed':'')+'">'+esc(deadlineState)+'</span>';
     $("detailBody").innerHTML=renderDetails(post.ai_details,post);
     $("detailContent").hidden=false;
     status.textContent="";
