@@ -993,7 +993,7 @@ body.admin-page{
 .go7-highlight-section .go7-info-table th{background:#166b46;color:#fff;text-align:center}
 .go7-highlight-section .go7-info-table td{font-weight:700;text-align:center}
 .go7-highlight-table{font-size:12px}
-.go7-links-section .go7-post-section>h2{background:#d8202f}
+.go7-post-section.go7-links-section>h2{background:#d8202f}
 .go7-important-links .go7-info-table th,.go7-important-links .go7-info-table td{background:#fff1a6;padding:9px 10px}
 .go7-important-links .go7-info-table th{width:48%;text-align:center}
 .go7-important-links .go7-info-table td{text-align:center}
