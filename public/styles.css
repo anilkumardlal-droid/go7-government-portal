@@ -915,8 +915,10 @@ body.admin-page{
 /* Admin real logo and inline SVG icon system */
 .admin-brand{gap:12px}
 .admin-brand-logo{
-  display:block;width:148px;height:48px;padding:4px 9px;
-  border-radius:8px;background:#fff;object-fit:contain;object-position:center;
+  display:block;width:148px;height:48px;padding:0;
+  border:0;border-radius:0;background:transparent;
+  object-fit:contain;object-position:center;
+  filter:brightness(0) invert(1);
 }
 .admin-brand-context{
   padding-left:12px;border-left:1px solid rgba(255,255,255,.3);
