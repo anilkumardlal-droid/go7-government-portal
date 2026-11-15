@@ -92,9 +92,23 @@ function renderSyncStatus(s){
 
 async function refreshSyncStatus(){
   const response=await call("/api/admin/sync/status");
-  if(response.status)renderSyncStatus(response.status);
-  else $("syncMessage").textContent="No sync process has been recorded yet.";
-  return response.status;
+  const status=response.status;
+  if(status){
+    renderSyncStatus(status);
+    const updatedAt=response.updated_at||status.updated_at;
+    if(updatedAt){
+      const time=new Date(updatedAt);
+      if(!Number.isNaN(time.getTime())){
+        const label=new Intl.DateTimeFormat("en-IN",{timeZone:"Asia/Kolkata",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true}).format(time);
+        const current=status.current_item?"Current source: "+status.current_item+" · ":"";
+        $("syncCurrent").textContent=current+"Last Worker update: "+label;
+      }
+    }
+  }else{
+    $("syncMessage").textContent="No sync run has been recorded yet. Start a sync to see actual Worker activity.";
+    $("syncCurrent").textContent="";
+  }
+  return status;
 }
 
 $("refreshSyncStatus").onclick=async()=>{
@@ -116,7 +130,19 @@ $("sync").onclick = async () => {
   try {
     say("Sync request started. Live progress is updating below.");
     await refreshSyncStatus().catch(()=>{});
-    pollTimer=window.setInterval(()=>refreshSyncStatus().catch(error=>console.warn("GO7 sync status:",error)),1200);
+    pollTimer=window.setInterval(async()=>{
+      try{
+        const status=await refreshSyncStatus();
+        if(!status){
+          $("syncMessage").textContent="The Worker status endpoint responded, but it has not saved a progress record for this run yet.";
+        }
+      }catch(error){
+        $("syncMessage").textContent="Live Worker status unavailable: "+error.message+". The updated Worker code must be deployed to Cloudflare before real progress can appear.";
+        $("syncCurrent").textContent="";
+        $("syncState").innerHTML=adminSvg("alert")+'<span>No live feed</span>';
+        $("syncState").className="sync-state idle";
+      }
+    },1200);
     const d=await call("/api/admin/sync","POST",{});
     await refreshSyncStatus().catch(()=>{});
     say(
