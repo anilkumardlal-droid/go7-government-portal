@@ -162,7 +162,7 @@
     const shareUrl="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
     const share='<div class="go7-share-row"><strong>Share this update:</strong><a href="https://api.whatsapp.com/send?text='+encodeURIComponent((p.title||"GO7 Update")+" "+shareUrl)+'" target="_blank" rel="noopener noreferrer">WhatsApp</a><a href="https://t.me/share/url?url='+encodeURIComponent(shareUrl)+'&text='+encodeURIComponent(p.title||"GO7 Update")+'" target="_blank" rel="noopener noreferrer">Telegram</a></div>';
     const feedback='<div class="go7-correction-box"><span>Found an error or outdated information? Share the GO7 page URL and the original official notice so we can review it.</span><a href="mailto:jobs@go7.in?subject='+encodeURIComponent("Correction request: "+(p.title||"GO7 update"))+'&body='+encodeURIComponent("GO7 page: "+shareUrl+"\nOriginal source: "+(p.source_url||"")+"\n\nCorrection details:")+'">Report a Correction</a></div>';
-    return '<div class="go7-post-intro">'+(showOverview?'<p class="go7-intro-text">'+esc(overview)+'</p>':'')+'</div>'+dateFee+ageVacancySection+parts.filter(Boolean).join("")+share+feedback;
+    return parts.filter(Boolean).join("")+share+feedback;
   }
   function setMeta(selector,attr,value){
     const node=document.querySelector(selector);
