@@ -96,8 +96,8 @@ jobs:
           assert "renderSyncStatus" in admin_js and "/api/admin/sync/status" in admin_js, "Admin live status polling is missing"
           assert "completed_with_errors" in admin_js and "Automatic 30-minute schedule" in admin_js, "Admin must distinguish automatic runs and source errors"
           assert "Live Worker status unavailable:" in admin_js, "Admin must show a clear error when live Worker progress is unavailable"
-          assert 'admin.js?v=go7-admin-auto-cron-20261115' in admin_console, "Admin script cache must be refreshed for automatic sync status"
-          assert 'styles.css?v=go7-admin-auto-cron-20261115' in admin_console, "Admin styles cache must be refreshed for sync warnings"
+          assert 'admin.js?v=go7-admin-backfill-20261115-1' in admin_console, "Admin script cache must be refreshed for old-post backfill"
+          assert 'styles.css?v=go7-admin-backfill-20261115-1' in admin_console, "Admin styles cache must be refreshed for old-post backfill"
 
           worker_js = (worker / "src/index.js").read_text(encoding="utf-8")
           assert "createAdminSyncReporter" in worker_js and "admin_sync_status" in worker_js, "D1-backed admin progress reporter is missing"
