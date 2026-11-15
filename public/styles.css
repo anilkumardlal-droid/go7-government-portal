@@ -1091,3 +1091,17 @@ body.admin-page{
   .go7-post-section>h2{padding:7px 8px}
   .go7-info-table th,.go7-info-table td{overflow-wrap:anywhere}
 }
+
+/* Required recruitment-information sections */
+.go7-required-two-panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.go7-required-panel{min-width:0}
+.go7-required-panel+.go7-required-panel{border-left:1px solid #c5ccd5}
+.go7-required-panel h3{margin:0;padding:6px 8px;background:#f0f3f8;color:#102a50;text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid #c5ccd5}
+.go7-required-panel .go7-notice-missing{margin:9px 10px}
+.go7-notice-missing{margin:9px 11px;color:#65748a;font-size:11px;line-height:1.6}
+.go7-highlight-section .go7-info-table td{font-weight:600}
+.go7-post-section.go7-links-section>h2{background:var(--red)}
+@media(max-width:760px){
+ .go7-required-two-panel{grid-template-columns:1fr}
+ .go7-required-panel+.go7-required-panel{border-left:0;border-top:1px solid #c5ccd5}
+}
