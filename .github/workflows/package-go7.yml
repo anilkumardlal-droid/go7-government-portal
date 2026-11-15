@@ -90,8 +90,15 @@ jobs:
           assert "Automatic publishing is enabled" in (root / "go7-owner-desk-7f3c9a/index.html").read_text(encoding="utf-8")
           assert "Auto-published official notices" in admin_js
           assert "data-approve" not in admin_js and "Approve & publish" not in admin_js, "Manual review approval controls must stay removed"
+          admin_console = (root / "go7-owner-desk-7f3c9a/index.html").read_text(encoding="utf-8")
+          assert "Sync process monitor" in admin_console and "syncProgressBar" in admin_console, "Live sync monitor is missing from Admin"
+          assert 'name="robots" content="noindex,nofollow"' in admin_console, "Admin console must remain noindex"
+          assert "renderSyncStatus" in admin_js and "/api/admin/sync/status" in admin_js, "Admin live status polling is missing"
 
           worker_js = (worker / "src/index.js").read_text(encoding="utf-8")
+          assert "createAdminSyncReporter" in worker_js and "admin_sync_status" in worker_js, "D1-backed admin progress reporter is missing"
+          assert 'if(path==="/api/admin/sync/status"&&request.method==="GET")' in worker_js, "Authenticated sync status endpoint is missing"
+          assert "syncOfficialMonitors(env.DB,env,dateBudget,publishedThisSyncByCategory,async update=>" in worker_js, "Official monitor progress callback is missing"
           assert "env.AI.toMarkdown" in worker_js, "Automatic HTML/PDF conversion is missing"
           assert "function officialPdfLinks" in worker_js, "Official PDF discovery is missing"
           assert "extractNoticeDatesFromText" in worker_js
