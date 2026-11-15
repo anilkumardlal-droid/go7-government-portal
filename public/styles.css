@@ -1036,3 +1036,28 @@ body.admin-page{
  .go7-info-table th,.go7-info-table td{padding:6px 5px}
  .go7-correction-box{align-items:flex-start}
 }
+/* Match detail-page typography to the rest of Jobs GO7 */
+.go7-post-heading h1,
+.go7-post-heading h1#detailTitle{
+  max-width:920px;margin:0 0 9px;color:var(--navy);
+  font-family:inherit;font-size:25px;font-style:normal;font-weight:600;
+  line-height:1.38;letter-spacing:-.25px;text-transform:none;
+  overflow-wrap:break-word;word-break:normal;
+}
+.go7-post-heading .eyebrow{font-size:9px;font-weight:800;letter-spacing:1.3px}
+.go7-post-meta{font-family:inherit;font-size:10px;font-weight:400;line-height:1.5}
+.go7-post-section>h2{font-family:inherit;font-size:13px;font-weight:700;letter-spacing:0;line-height:1.45}
+.go7-info-table{font-family:inherit;font-size:12px;font-weight:400;line-height:1.55}
+.go7-info-table thead th,.go7-info-table tbody th{font-weight:600}
+.go7-post-bullets li,.go7-post-section>p{font-family:inherit;font-size:12px;font-weight:400}
+.go7-related-box h3{font-size:12px;font-weight:600}
+.go7-related-list a{font-size:11px;font-weight:500}
+.go7-post-wrap .breadcrumb{font-size:10px}
+@media(max-width:760px){
+  .go7-post-heading h1,.go7-post-heading h1#detailTitle{font-size:22px;font-weight:600;line-height:1.4;letter-spacing:-.15px}
+  .go7-post-section>h2{font-size:12px;font-weight:700}
+  .go7-info-table{font-size:11px}
+}
+@media(max-width:420px){
+  .go7-post-heading h1,.go7-post-heading h1#detailTitle{font-size:20px;font-weight:600;line-height:1.4}
+}
