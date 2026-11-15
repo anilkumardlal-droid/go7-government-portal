@@ -124,7 +124,12 @@
     const overview=d.overview||p.summary||"";
     const normalizedOverview=String(overview).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     const normalizedTitle=String(p.title||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-    const showOverview=present(overview)&&normalizedOverview!==normalizedTitle&&normalizedOverview.length>Math.min(25,normalizedTitle.length);
+    const titleWords=normalizedTitle.split(" ");
+    const overviewWords=normalizedOverview.split(" ");
+    const startsWithFullTitle=titleWords.length>2&&titleWords.every((word,index)=>overviewWords[index]===word);
+    const overviewRemainder=overviewWords.slice(titleWords.length).join(" ");
+    const shortTitleRepeat=startsWithFullTitle&&overviewRemainder.length<28;
+    const showOverview=present(overview)&&normalizedOverview!==normalizedTitle&&!shortTitleRepeat&&normalizedOverview.length>Math.min(35,normalizedTitle.length);
     const deadline=p.application_last_date||d.important_dates?.last_date;
     const dates=rowTable(d,p);
     const fee=feeTable(d);
