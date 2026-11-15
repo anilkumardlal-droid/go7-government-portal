@@ -17,7 +17,7 @@
       if(!r.ok)throw new Error("Updates service returned "+r.status);
       const data=await r.json(),posts=data.posts||[];
       const viewAll=panel.querySelector(".view-all");
-      if(viewAll)viewAll.hidden=Number(data.total||0)<=15;
+      if(viewAll)viewAll.style.display=Number(data.total||0)>15?"inline-flex":"none";
       target.innerHTML=posts.length?posts.map(p=>'<a class="post-link feed-link" href="'+postHref(p)+'"><span class="post-list-marker" aria-hidden="true">*</span>'+newBadge(p)+closedBadge(p)+'<span class="home-post-title">'+esc(p.title||"Government Update")+'</span></a>').join(""):'<p class="empty-panel">No updates published in this category yet.</p>';
     }catch(e){
       console.error("GO7 category load:",cat,e);
