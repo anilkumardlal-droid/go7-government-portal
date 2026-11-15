@@ -1061,3 +1061,33 @@ body.admin-page{
 @media(max-width:420px){
   .go7-post-heading h1,.go7-post-heading h1#detailTitle{font-size:20px;font-weight:600;line-height:1.4}
 }
+
+/* Post article refinements: compact intro, social row and responsive tables */
+.go7-share-row{margin:12px 0 13px;padding:0;gap:8px}
+.go7-share-row strong{font-size:11px;font-weight:700}
+.go7-share-row a{padding:7px 13px;font-size:10px;border-radius:3px}
+.go7-share-top{margin:10px 0 13px}
+.go7-share-bottom{margin:14px 0 10px}
+.go7-post-intro{margin-bottom:10px}
+.go7-overview-panel>p{margin:9px 11px}
+.go7-two-column .go7-post-section>h2{background:var(--navy)}
+.go7-fee-list .go7-post-bullets{padding-top:5px;padding-bottom:5px}
+.go7-post-section{scroll-margin-top:18px}
+.go7-post-section:empty{display:none}
+.go7-post-section.go7-links-section>h2{background:var(--red)}
+.go7-post-section.go7-source-section>p{margin:8px 10px}
+.go7-post-meta strong{font-weight:700}
+.go7-meta-status{font-size:9px;line-height:1.4}
+.go7-meta-status strong{font-weight:800}
+.go7-related-grid{margin:0}
+@media(max-width:760px){
+  .go7-two-column{grid-template-columns:1fr}
+  .go7-share-row{gap:7px}
+  .go7-share-row strong{flex-basis:100%}
+  .go7-info-table{min-width:0}
+}
+@media(max-width:420px){
+  .go7-post-section{margin-bottom:10px}
+  .go7-post-section>h2{padding:7px 8px}
+  .go7-info-table th,.go7-info-table td{overflow-wrap:anywhere}
+}
