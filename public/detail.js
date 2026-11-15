@@ -4,6 +4,21 @@
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const nice=value=>String(value||"").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+  function readableTitle(value){
+    const original=String(value||"").replace(/\s+/g," ").trim();
+    const words=original.match(/[A-Za-z]{3,}/g)||[];
+    if(!words.length)return original;
+    const uppercaseWords=words.filter(word=>word===word.toUpperCase());
+    if(uppercaseWords.length/words.length<0.68)return original;
+    let result=original.toLowerCase().replace(/(^|[.!?:;([{\u2013\u2014-]\s*)([a-z])/g,(_,prefix,letter)=>prefix+letter.toUpperCase());
+    result=result.replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,word=>word[0].toUpperCase()+word.slice(1));
+    const acronyms=["RRB","NTPC","MCQ","UG","CBT","UPSC","SSC","PSC","WBPSC","BPSC","NTA","NEET","JEE","CGL","CHSL","GD","CISF","BSF","CRPF","ITBP","SBI","IBPS","NIC","GATE","UGC","NET","TGT","PGT","ITI","EWS","OBC","SC","ST","PH","PWD","UR","PDF","AI","CTET","DSSSB","ESIC","DRDO","ISRO","CSIR","RBI","LIC","EPFO"];
+    for(const acronym of acronyms){
+      result=result.replace(new RegExp("\\b"+acronym+"\\b","gi"),acronym);
+    }
+    result=result.replace(/\bno\./gi,"No.").replace(/\badvt\.?/gi,"Advt.");
+    return result;
+  }
   const missing=value=>{
     if(value===null||value===undefined)return true;
     if(typeof value==="string"){
@@ -139,12 +154,13 @@
     const ageVacancySection=ageVacancy?section(recruitment?"Age Limit & Total Vacancy":"Key Information",ageVacancy,"go7-highlight-section"):"";
     const eligibility=eligibilityTable(d);
     const vacancy=vacancyTable(d);
-    const qualification=table(["Eligibility Details","Information"],[
+    const qualificationRows=[
       ["Educational Qualification",d.educational_qualification],
       ["Other Eligibility Conditions",d.eligibility],
       ["Age Relaxation",d.age_relaxation],
       ["Salary / Pay Scale",d.salary]
-    ]);
+    ].filter(([,value])=>present(value));
+    const qualification=table(["Eligibility Details","Information"],qualificationRows);
     const selection=bullets(d.selection_process,false);
     const exam=bullets(d.exam_pattern,false);
     const how=bullets(d.how_to_apply,true);
@@ -165,7 +181,7 @@
     parts.push(section("Source & Verification",present(d.source_evidence)?'<p>'+esc(d.source_evidence)+'</p>':(present(p.date_checked_at)?'<p>Source details last checked on '+esc(dateText(p.date_checked_at))+'. Please confirm any subsequent changes with the issuing authority.</p>':'<p>For the latest and complete information, check the original publisher and issuing authority notice.</p>'),"go7-source-section"));
     parts.push(section("Latest & Related Updates",renderRelatedShell(),"go7-related-section"));
     const shareUrl="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
-    const share='<div class="go7-share-row"><strong>Share this update:</strong><a href="https://api.whatsapp.com/send?text='+encodeURIComponent((p.title||"GO7 Update")+" "+shareUrl)+'" target="_blank" rel="noopener noreferrer">WhatsApp</a><a href="https://t.me/share/url?url='+encodeURIComponent(shareUrl)+'&text='+encodeURIComponent(p.title||"GO7 Update")+'" target="_blank" rel="noopener noreferrer">Telegram</a></div>';
+    const share='<div class="go7-share-row"><strong>Share this update:</strong><a href="https://api.whatsapp.com/send?text='+encodeURIComponent(readableTitle(p.title||"GO7 Update")+" "+shareUrl)+'" target="_blank" rel="noopener noreferrer">WhatsApp</a><a href="https://t.me/share/url?url='+encodeURIComponent(shareUrl)+'&text='+encodeURIComponent(readableTitle(p.title||"GO7 Update"))+'" target="_blank" rel="noopener noreferrer">Telegram</a></div>';
     const feedback='<div class="go7-correction-box"><span>Found an error or outdated information? Share the GO7 page URL and the original official notice so we can review it.</span><a href="mailto:jobs@go7.in?subject='+encodeURIComponent("Correction request: "+(p.title||"GO7 update"))+'&body='+encodeURIComponent("GO7 page: "+shareUrl+"\nOriginal source: "+(p.source_url||"")+"\n\nCorrection details:")+'">Report a Correction</a></div>';
     return parts.filter(Boolean).join("")+share+feedback;
   }
@@ -178,7 +194,7 @@
     const d=new Date(value);return Number.isNaN(d.getTime())?"":d.toISOString();
   }
   function updateMetadata(p){
-    const title=(p.title||"Update Details")+" | Jobs GO7";
+    const title=readableTitle(p.title||"Update Details")+" | Jobs GO7";
     const description=String(p.ai_details?.overview||p.summary||"Government recruitment, result, admit card and examination updates on Jobs GO7.").replace(/\s+/g," ").slice(0,220);
     const canonical="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
     document.title=title;
@@ -235,9 +251,10 @@
     if(!p)throw Error("Update not found.");
     updateMetadata(p);
     const category=p.category||"jobs-vacancies";
-    $("detailBreadcrumb").innerHTML=' › <a href="/'+esc(category)+'/">'+esc(p.category_label||nice(category))+'</a> › '+esc(p.title||"Details");
+    $("detailBreadcrumb").innerHTML=' › <a href="/'+esc(category)+'/">'+esc(p.category_label||nice(category))+'</a> › '+esc(pageTitle);
     $("detailCategory").textContent=p.category_label||nice(category);
-    $("detailTitle").textContent=p.title||"Government Update";
+    const pageTitle=readableTitle(p.title||"Government Update");
+    $("detailTitle").textContent=pageTitle;
     const deadline=p.application_last_date||p.ai_details?.important_dates?.last_date;
     const status=present(deadline)?(expired(deadline)?"Application deadline passed":"Application deadline not passed"):"Check original notification for current deadline";
     $("detailMeta").innerHTML='<span><strong>Publisher:</strong> '+esc(p.source_name||"Original publisher")+'</span><span><strong>GO7 Listed:</strong> '+esc(dateText(p.published_at||p.created_at))+'</span><span class="go7-meta-status '+(expired(deadline)?"closed":"")+'">'+esc(status)+'</span>';
