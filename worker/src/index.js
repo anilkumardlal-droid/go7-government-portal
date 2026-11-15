@@ -1519,7 +1519,7 @@ ${notice.text.slice(0, 24000)}`;
       { role: "system", content: "You are a strict document extraction engine. Never fabricate. Return JSON only." },
       { role: "user", content: prompt }
     ],
-    max_tokens: 2200,
+    max_tokens: 3000,
     temperature: 0.1
   });
   const raw = result?.response || result?.result?.response || result?.output_text || "";
@@ -1570,10 +1570,24 @@ ${notice.text.slice(0, 24000)}`;
         Object.fromEntries(fields.map(field => [field, clean(row[field] == null || row[field] === "" ? MISSING : String(row[field]), 700)]))
       )
     : [];
-  details.vacancy_breakdown = normalizeRows(details.vacancy_breakdown, ["category", "vacancies"]);
-  details.post_wise_eligibility = normalizeRows(details.post_wise_eligibility, ["post_name", "educational_qualification", "age_limit", "typing_requirement"]);
-  details.faqs = normalizeRows(details.faqs, ["question", "answer"]);
-  details.exam_pattern = Array.isArray(details.exam_pattern) ? details.exam_pattern.slice(0, 30).map(value => clean(String(value), 500)) : [];
+  details.vacancy_breakdown = normalizeRows(details.vacancy_breakdown, ["category", "vacancies"])
+    .filter(row => row.category !== MISSING && row.vacancies !== MISSING);
+  details.post_wise_eligibility = normalizeRows(details.post_wise_eligibility, ["post_name", "educational_qualification", "age_limit", "typing_requirement"])
+    .filter(row => row.post_name !== MISSING && [row.educational_qualification, row.age_limit, row.typing_requirement].some(value => value !== MISSING));
+  details.faqs = normalizeRows(details.faqs, ["question", "answer"])
+    .filter(row => row.question !== MISSING && row.answer !== MISSING);
+  details.exam_pattern = Array.isArray(details.exam_pattern)
+    ? details.exam_pattern.map(value => clean(String(value), 500)).filter(value => value && value !== MISSING).slice(0, 30)
+    : [];
+  details.official_links = Array.isArray(details.official_links)
+    ? details.official_links.flatMap(item => {
+        try {
+          const link = new URL(String(item?.url || ""));
+          if (!safeHttpUrl(link.href) || !isOfficialHost(link.hostname)) return [];
+          return [{label:clean(item.label || "Official Link", 100),url:link.href}];
+        } catch { return []; }
+      }).slice(0, 15)
+    : [];
   details.extraction_note = "AI-extracted from the linked official notice. Verify the original notification before applying.";
   return { details, sourceUrl: notice.finalUrl, isPdf: notice.isPdf };
 }
