@@ -12,7 +12,7 @@
     const cat=panel.dataset.category,target=panel.querySelector(".panel-body"),refresh=panel.querySelector(".panel-refresh");
     if(refresh){refresh.disabled=true;refresh.classList.add("is-loading");}
     try{
-      const url=API+"/api/posts?"+new URLSearchParams({category:cat,limit:"50",offset:"0"});
+      const url=API+"/api/posts?"+new URLSearchParams({category:cat,limit:"15",offset:"0"});
       const r=await fetch(url,{cache:"no-store"});
       if(!r.ok)throw new Error("Updates service returned "+r.status);
       const data=await r.json(),posts=data.posts||[];
