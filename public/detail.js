@@ -307,7 +307,7 @@
     updateMetadata(p);
     const category=p.category||"jobs-vacancies";
     const pageTitle=readableTitle(p.title||"Government Update");
-    $("detailBreadcrumb").innerHTML=' › <a href="/'+esc(category)+'/">'+esc(p.category_label||nice(category))+'</a> › '+esc(pageTitle);
+
     $("detailCategory").textContent=p.category_label||nice(category);
     $("detailTitle").textContent=pageTitle;
     const deadline=p.application_last_date||p.ai_details?.important_dates?.last_date;
