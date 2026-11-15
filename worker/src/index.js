@@ -83,6 +83,13 @@ function isConcreteGovtNotice(title, summary = "") {
   const concrete = /\b(?:advt?\.?\s*(?:no\.?|number)?|advertisement\s+(?:no\.?|number|for)|notification\s+(?:no\.?|number|for|regarding)|recruitment\s+(?:notification|of|to|for)|applications?\s+(?:are\s+)?invited|inviting\s+(?:online\s+)?applications?|apply\s+online|vacanc(?:y|ies)|posts?\s+of|post\s+of|CEN[-\s/]?\d|selection\s+list|merit\s+list|short[-\s]?listed|result\s+of|admit\s+card\s+for|hall\s+ticket\s+for|answer\s+keys?\s+(?:for|of)|response\s+sheet\s+for|exam(?:ination)?\s+(?:date|schedule|notification|notice)|call\s+letter\s+for|corrigendum\s+to|extension\s+of\s+(?:time\s+for\s+receipt\s+of\s+)?(?:the\s+)?(?:last\s+date|applications?|application|date)|postpon(?:ed|ement)|reschedul(?:ed|ing)|provisional\s+result|final\s+result)\b/i;
   if (concrete.test(t)) return true;
 
+  // Hindi-language recruitment boards publish their notice titles in Devanagari.
+  const hindiCombined=t+" "+s;
+  const hindiRecruitment=/(?:भर्ती|रिक्ति(?:यां|यों)?|पदों? पर|सीधी भर्ती|नियुक्ति)/.test(hindiCombined);
+  const hindiAction=/(?:विज्ञापन|अधिसूचना|विज्ञप्ति|आवेदन|चयन|परिणाम|प्रवेश पत्र|उत्तर कुंजी|परीक्षा|स्थगित|संशोधन|काउंसलिंग)/.test(hindiCombined);
+  const hindiEvidence=/(?:20\d{2}|विज्ञापन संख्या|विज्ञापन सं\\.?|अभ्यर्थी|पदों? पर|ऑनलाइन|अंतिम तिथि|प्रारंभिक परीक्षा|मुख्य परीक्षा)/.test(hindiCombined);
+  if(hindiRecruitment&&hindiAction&&hindiEvidence)return true;
+
   // Some State PSC portals list a named examination plus an advertisement number.
   const advertId = /\b(?:[A-Z]{0,3}[-/]?\d{1,4}\/[A-Z0-9-]+\/20\d{2}|CEN[-\s]?\d{1,4}\/20\d{2})\b/i;
   if (advertId.test(t) && /\b(?:exam(?:ination)?|test|recruitment)\b/i.test(t)) return true;
@@ -101,16 +108,31 @@ function isConcreteGovtNotice(title, summary = "") {
 const EDUCATION_NOTICE_RE =
   /\b(?:admissions?|entrance(?:\s+(?:exam|examination|test))?|counsell?ing|seat allotment|scholarships?|academic session|registration|enrolment|enrollment|exam(?:ination)? form|board examination|board exam|date sheet|time ?table|syllabus|model question|merit list|application form|information bulletin|semester examination|secondary examination|intermediate examination|UGC[- ]?NET|CUET|NEET|JEE|B\.?Ed|class\s*(?:[6-9]|10|11|12|ix|x|xi|xii))\b/i;
 
+const HINDI_EDUCATION_RE =
+  /(?:प्रवेश|एडमिशन|प्रवेश परीक्षा|परीक्षा|परीक्षाफल|परिणाम|आवेदन|आवेदन पत्र|पंजीकरण|समय सारणी|परीक्षा कार्यक्रम|पाठ्यक्रम|छात्रवृत्ति|काउंसलिंग|प्रवेश पत्र|मॉडल पेपर|शैक्षिक सत्र|नामांकन|माध्यमिक|इंटरमीडिएट|विश्वविद्यालय|महाविद्यालय|विद्यालय|विज्ञप्ति)/;
+
+const HINDI_EDUCATION_ACTION_RE =
+  /(?:सूचना|अधिसूचना|विज्ञप्ति|आवेदन|पंजीकरण|प्रवेश|परीक्षा|परिणाम|समय सारणी|परीक्षा कार्यक्रम|संशोधित|संशोधन|विस्तार|अंतिम तिथि|काउंसलिंग|पाठ्यक्रम|छात्रवृत्ति)/;
+
+const HINDI_EDUCATION_DETAIL_RE =
+  /(?:20\d{2}|कक्षा|सेमेस्टर|स्नातक|स्नातकोत्तर|विश्वविद्यालय|महाविद्यालय|विद्यालय|बोर्ड|प्रवेश|परीक्षा|शैक्षिक सत्र|ऑनलाइन आवेदन|अंतिम तिथि|कक्षा\\s*[6-9]|कक्षा\\s*(?:10|11|12))/;
+
 function isConcreteEducationNotice(title, summary = "") {
   const t = clean(title, 500).replace(/\s+/g, " ").trim();
   const s = clean(summary, 1600).replace(/\s+/g, " ").trim();
   if (!isUsefulNoticeTitle(t) || GENERIC_NAV_TITLE_RE.test(t)) return false;
   if (/\b(?:sports fixture|tender|procurement|quotation|photo gallery|celebration|teacher transfer|promotion order|seniority list|office routine|holiday list)\b/i.test(t)) return false;
   const combined = t + " " + s;
-  if (!EDUCATION_NOTICE_RE.test(combined)) return false;
+  const englishMatch=EDUCATION_NOTICE_RE.test(combined);
+  const hindiMatch=HINDI_EDUCATION_RE.test(combined);
+  if(!englishMatch&&!hindiMatch)return false;
+  if(hindiMatch&&/(?:शिक्षक|कार्मिक|कर्मचारी|स्थानांतरण|कार्यालय आदेश|निविदा)/.test(t))return false;
   const action = /\b(?:notice|notification|inviting|online application|apply|registration|form|schedule|date|extended|extension|allotment|counselling|counseling|result|merit list|admission|entrance|exam|examination|scholarship|syllabus|bulletin|academic session)\b/i;
   const detail = /\b(?:20\d{2}|class|semester|UG|PG|degree|diploma|school|college|university|board|entrance|admission|exam|examination|last date|online|application|session|CUET|NEET|JEE|B\.?Ed|UGC)\b/i;
-  return action.test(t) && (detail.test(t + " " + s) || t.length >= 65);
+  const actionHindi=HINDI_EDUCATION_ACTION_RE.test(combined);
+  const detailHindi=HINDI_EDUCATION_DETAIL_RE.test(combined);
+  return (englishMatch&&action.test(t)&&(detail.test(t+" "+s)||t.length>=65)) ||
+    (hindiMatch&&actionHindi&&(detailHindi||t.length>=65));
 }
 
 function isConcreteFeedNotice(title, summary = "") {
@@ -775,6 +797,8 @@ const OFFICIAL_MONITOR_BATCH_SIZE = 6;
 
 const RECRUITMENT_RE =
   /\b(advt?\.?\s*no\.?|advertisement\s+no\.?|recruitment|recruit|vacanc(?:y|ies)|advertisement|employment notice|employment notification|job notification|apply online|application(?:s)?|last date|short notice|cen[-\s]?\d|ntpc|group[-\s]?d|assistant loco|technician|junior engineer|selection post|combined graduate|combined higher secondary|stenographer|constable|sub[-\s]?inspector|admit[\s-]*cards?|hall tickets?|answer[\s-]*keys?|response sheets?|results?|merit lists?|selection panels?|selected candidates|shortlisted candidates|apprentice|exam(?:ination)? date|exam(?:ination)? schedule|skill test|cbt|corrigendum|postpon(?:ed|ement)|personality test|written test|preliminary examination|main examination|provisional result|final result)\b/i;
+const HINDI_RECRUITMENT_RE =
+  /(?:भर्ती|रिक्ति|विज्ञापन|अधिसूचना|विज्ञप्ति|आवेदन|चयन|परिणाम|प्रवेश पत्र|उत्तर कुंजी|अभ्यर्थी|परीक्षा|नियुक्ति|सीधी भर्ती)/;
 
 const IGNORE_RE =
   /\b(tender|procurement|quotation|annual report|press release|meeting|photo gallery|celebration|e[-\s]?auction)\b/i;
