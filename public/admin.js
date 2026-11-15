@@ -61,11 +61,13 @@ function renderSyncStatus(s){
   const progressTrack=document.querySelector(".sync-progress-track");
   if(progressTrack)progressTrack.setAttribute("aria-valuenow",String(Math.round(progress)));
   $("syncMessage").textContent=s.message||"No process message.";
-  $("syncCurrent").textContent=s.current_item?"Current source: "+s.current_item:"";
+  const triggerLabel=s.trigger==="automatic"?"Automatic 30-minute schedule":s.trigger==="manual"?"Manual sync":"";
+  $("syncCurrent").textContent=[triggerLabel,s.current_item?"Current source: "+s.current_item:""].filter(Boolean).join(" · ");
   const state=s.status||"idle";
-  const stateLabel=state==="running"?"In progress":state==="completed"?"Completed":state==="failed"?"Failed":"Idle";
-  $("syncState").innerHTML=adminSvg(state==="completed"?"check":state==="failed"?"alert":"activity")+'<span>'+stateLabel+'</span>';
-  $("syncState").className="sync-state "+state;
+  const stateLabel=state==="running"?"In progress":state==="completed"?"Completed":state==="completed_with_errors"?"Completed · issues":state==="failed"?"Failed":"Idle";
+  const stateIcon=state==="completed"?"check":(state==="failed"||state==="completed_with_errors")?"alert":"activity";
+  $("syncState").innerHTML=adminSvg(stateIcon)+'<span>'+stateLabel+'</span>';
+  $("syncState").className="sync-state "+(state==="completed_with_errors"?"warning":state);
   const stats=[
     ["rss","RSS feeds",`${s.rss_checked||0}/${s.rss_total||0}`],
     ["globe","Official checks",`${s.official_checked||0}/${s.official_batch_total||0}`],
@@ -100,8 +102,9 @@ async function refreshSyncStatus(){
       const time=new Date(updatedAt);
       if(!Number.isNaN(time.getTime())){
         const label=new Intl.DateTimeFormat("en-IN",{timeZone:"Asia/Kolkata",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true}).format(time);
-        const current=status.current_item?"Current source: "+status.current_item+" · ":"";
-        $("syncCurrent").textContent=current+"Last Worker update: "+label;
+        const triggerLabel=status.trigger==="automatic"?"Automatic 30-minute schedule":status.trigger==="manual"?"Manual sync":"";
+        const current=status.current_item?"Current source: "+status.current_item:"";
+        $("syncCurrent").textContent=[triggerLabel,current,"Last Worker update: "+label].filter(Boolean).join(" · ");
       }
     }
   }else{
