@@ -87,7 +87,7 @@ function isConcreteGovtNotice(title, summary = "") {
   const hindiCombined=t+" "+s;
   const hindiRecruitment=/(?:भर्ती|रिक्ति(?:यां|यों)?|पदों? पर|सीधी भर्ती|नियुक्ति)/.test(hindiCombined);
   const hindiAction=/(?:विज्ञापन|अधिसूचना|विज्ञप्ति|आवेदन|चयन|परिणाम|प्रवेश पत्र|उत्तर कुंजी|परीक्षा|स्थगित|संशोधन|काउंसलिंग)/.test(hindiCombined);
-  const hindiEvidence=/(?:20\d{2}|विज्ञापन संख्या|विज्ञापन सं\\.?|अभ्यर्थी|पदों? पर|ऑनलाइन|अंतिम तिथि|प्रारंभिक परीक्षा|मुख्य परीक्षा)/.test(hindiCombined);
+  const hindiEvidence=/(?:20\d{2}|विज्ञापन संख्या|विज्ञापन सं\.?|अभ्यर्थी|पदों? पर|ऑनलाइन|अंतिम तिथि|प्रारंभिक परीक्षा|मुख्य परीक्षा)/.test(hindiCombined);
   if(hindiRecruitment&&hindiAction&&hindiEvidence)return true;
 
   // Some State PSC portals list a named examination plus an advertisement number.
@@ -115,7 +115,7 @@ const HINDI_EDUCATION_ACTION_RE =
   /(?:सूचना|अधिसूचना|विज्ञप्ति|आवेदन|पंजीकरण|प्रवेश|परीक्षा|परिणाम|समय सारणी|परीक्षा कार्यक्रम|संशोधित|संशोधन|विस्तार|अंतिम तिथि|काउंसलिंग|पाठ्यक्रम|छात्रवृत्ति)/;
 
 const HINDI_EDUCATION_DETAIL_RE =
-  /(?:20\d{2}|कक्षा|सेमेस्टर|स्नातक|स्नातकोत्तर|विश्वविद्यालय|महाविद्यालय|विद्यालय|बोर्ड|प्रवेश|परीक्षा|शैक्षिक सत्र|ऑनलाइन आवेदन|अंतिम तिथि|कक्षा\\s*[6-9]|कक्षा\\s*(?:10|11|12))/;
+  /(?:20\d{2}|कक्षा|सेमेस्टर|स्नातक|स्नातकोत्तर|विश्वविद्यालय|महाविद्यालय|विद्यालय|बोर्ड|प्रवेश|परीक्षा|शैक्षिक सत्र|ऑनलाइन आवेदन|अंतिम तिथि|कक्षा\s*[6-9]|कक्षा\s*(?:10|11|12))/;
 
 function isConcreteEducationNotice(title, summary = "") {
   const t = clean(title, 500).replace(/\s+/g, " ").trim();
