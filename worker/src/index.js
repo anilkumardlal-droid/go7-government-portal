@@ -1595,6 +1595,7 @@ ${notice.text.slice(0, 24000)}`;
       }).slice(0, 15)
     : [];
   details.extraction_note = "AI-extracted from the linked official notice. Verify the original notification before applying.";
+  details.extraction_version = "2026-11-15-2";
   return { details, sourceUrl: notice.finalUrl, isPdf: notice.isPdf };
 }
 
@@ -1862,11 +1863,11 @@ export default {
           const limit=Math.min(500,Math.max(1,Number(url.searchParams.get("limit")||100)));
           const offset=Math.max(0,Number(url.searchParams.get("offset")||0));
           const count=await env.DB.prepare(
-            "SELECT COUNT(*) AS total FROM posts WHERE status='published' AND (ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source') OR (ai_extraction_status='completed' AND (ai_details_json IS NULL OR ai_details_json='')))"
+            "SELECT COUNT(*) AS total FROM posts WHERE status='published' AND (COALESCE(ai_extraction_status,'')!='needs_official_source' AND (COALESCE(ai_extraction_status,'')!='completed' OR COALESCE(json_extract(ai_details_json,'$.extraction_version'),'')!='2026-11-15-2'))"
           ).first();
           const rows=await env.DB.prepare(
             "SELECT id,title,summary,category,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts " +
-            "WHERE status='published' AND (ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source') OR (ai_extraction_status='completed' AND (ai_details_json IS NULL OR ai_details_json=''))) " +
+            "WHERE status='published' AND (COALESCE(ai_extraction_status,'')!='needs_official_source' AND (COALESCE(ai_extraction_status,'')!='completed' OR COALESCE(json_extract(ai_details_json,'$.extraction_version'),'')!='2026-11-15-2')) " +
             "ORDER BY COALESCE(published_at,created_at) DESC,id DESC LIMIT ? OFFSET ?"
           ).bind(limit,offset).all();
           return json({
@@ -1875,7 +1876,7 @@ export default {
             limit,
             offset,
             counts_by_category:(await env.DB.prepare(
-              "SELECT category,COUNT(*) AS total FROM posts WHERE status='published' AND (ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source') OR (ai_extraction_status='completed' AND (ai_details_json IS NULL OR ai_details_json=''))) GROUP BY category ORDER BY total DESC"
+              "SELECT category,COUNT(*) AS total FROM posts WHERE status='published' AND (COALESCE(ai_extraction_status,'')!='needs_official_source' AND (COALESCE(ai_extraction_status,'')!='completed' OR COALESCE(json_extract(ai_details_json,'$.extraction_version'),'')!='2026-11-15-2')) GROUP BY category ORDER BY total DESC"
             ).all()).results||[]
           },200,corsOrigin);
         }
@@ -1888,8 +1889,10 @@ export default {
             "SELECT id,title,summary,category,source_name,source_url,ai_extraction_status,ai_details_json FROM posts WHERE id=? AND status='published'"
           ).bind(id).first();
           if(!post)return json({id,status:"not_found",message:"Published post not found."},404,corsOrigin);
-          if(post.ai_extraction_status==="completed"&&post.ai_details_json){
-            return json({id,status:"already_completed",message:"This post already has extracted details."},200,corsOrigin);
+          let savedExtractionVersion="";
+          try{savedExtractionVersion=JSON.parse(post.ai_details_json||"{}").extraction_version||"";}catch{}
+          if(post.ai_extraction_status==="completed"&&savedExtractionVersion==="2026-11-15-2"){
+            return json({id,status:"already_completed",message:"This post already has the latest extracted details."},200,corsOrigin);
           }
           const sourceHost=(()=>{try{return new URL(String(post.source_url||"")).hostname;}catch{return "";}})();
           if(!isOfficialHost(sourceHost)){
