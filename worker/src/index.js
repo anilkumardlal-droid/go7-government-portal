@@ -1862,11 +1862,11 @@ export default {
           const limit=Math.min(500,Math.max(1,Number(url.searchParams.get("limit")||100)));
           const offset=Math.max(0,Number(url.searchParams.get("offset")||0));
           const count=await env.DB.prepare(
-            "SELECT COUNT(*) AS total FROM posts WHERE status='published' AND (ai_details_json IS NULL OR ai_details_json='' OR ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source'))"
+            "SELECT COUNT(*) AS total FROM posts WHERE status='published' AND (ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source') OR (ai_extraction_status='completed' AND (ai_details_json IS NULL OR ai_details_json='')))"
           ).first();
           const rows=await env.DB.prepare(
             "SELECT id,title,summary,category,source_name,source_url,ai_extraction_status,ai_extraction_error FROM posts " +
-            "WHERE status='published' AND (ai_details_json IS NULL OR ai_details_json='' OR ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source')) " +
+            "WHERE status='published' AND (ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source') OR (ai_extraction_status='completed' AND (ai_details_json IS NULL OR ai_details_json=''))) " +
             "ORDER BY COALESCE(published_at,created_at) DESC,id DESC LIMIT ? OFFSET ?"
           ).bind(limit,offset).all();
           return json({
@@ -1875,7 +1875,7 @@ export default {
             limit,
             offset,
             counts_by_category:(await env.DB.prepare(
-              "SELECT category,COUNT(*) AS total FROM posts WHERE status='published' AND (ai_details_json IS NULL OR ai_details_json='' OR ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source')) GROUP BY category ORDER BY total DESC"
+              "SELECT category,COUNT(*) AS total FROM posts WHERE status='published' AND (ai_extraction_status IS NULL OR ai_extraction_status NOT IN ('completed','needs_official_source') OR (ai_extraction_status='completed' AND (ai_details_json IS NULL OR ai_details_json=''))) GROUP BY category ORDER BY total DESC"
             ).all()).results||[]
           },200,corsOrigin);
         }
