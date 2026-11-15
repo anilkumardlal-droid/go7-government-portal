@@ -1506,7 +1506,7 @@ async function extractNoticeWithAI(env, post, suppliedText, suppliedSourceUrl) {
   if (text.length < 300) throw new Error("Extracted notice text is too short. Please upload a readable PDF.");
   const notice = { text, finalUrl: sourceUrl, isPdf: true };
 
-  const prompt = `You extract factual recruitment information from official Indian government notifications. Use ONLY the supplied source text. Do not infer or invent facts. Return ONLY valid JSON. For every unavailable field use exactly: "${MISSING}". Keep all values in English. If the notice is not a recruitment notice, set notice_type accordingly and explain briefly in overview. Schema: {"notice_type":"Recruitment|Result|Admit Card|Other","overview":"...","department":"...","post_names":["..."],"total_vacancies":"...","eligibility":"...","educational_qualification":"...","age_limit":"...","age_relaxation":"...","salary":"...","application_fee":"...","important_dates":{"notification_date":"...","start_date":"...","last_date":"...","exam_date":"..."},"selection_process":["..."],"how_to_apply":["..."],"documents_required":["..."],"official_links":[{"label":"...","url":"..."}],"source_evidence":"Briefly identify the relevant wording or section in the source."}.
+  const prompt = `You extract factual recruitment information from official Indian government notifications. Use ONLY the supplied source text. Do not infer, estimate or invent facts. Return ONLY valid JSON. For every unavailable scalar field use exactly: "${MISSING}". Keep all values in English. If the notice is not a recruitment notice, set notice_type accordingly and explain briefly in overview. Return vacancy_breakdown rows, post_wise_eligibility rows and faqs only when the official source provides the facts. Do not create generic FAQs or fill gaps from memory. Schema: {"notice_type":"Recruitment|Result|Admit Card|Other","overview":"...","department":"...","post_names":["..."],"total_vacancies":"...","eligibility":"...","educational_qualification":"...","age_limit":"...","age_relaxation":"...","salary":"...","application_fee":"...","important_dates":{"notification_date":"...","start_date":"...","last_date":"...","exam_date":"...","fee_last_date":"...","correction_date":"...","admit_card_date":"...","result_date":"..."},"vacancy_breakdown":[{"category":"...","vacancies":"..."}],"post_wise_eligibility":[{"post_name":"...","educational_qualification":"...","age_limit":"...","typing_requirement":"..."}],"selection_process":["..."],"exam_pattern":["..."],"how_to_apply":["..."],"documents_required":["..."],"faqs":[{"question":"...","answer":"..."}],"official_links":[{"label":"...","url":"..."}],"source_evidence":"Briefly identify the relevant wording or section in the source."}.
 
 Notice title: ${clean(post.title, 220)}
 Department/source: ${clean(post.source_name, 120)}
@@ -1529,15 +1529,17 @@ ${notice.text.slice(0, 24000)}`;
   }
 
   const arrayFields = new Set([
-    "post_names", "selection_process", "how_to_apply",
-    "documents_required", "official_links"
+    "post_names", "selection_process", "exam_pattern", "how_to_apply",
+    "documents_required", "official_links", "vacancy_breakdown",
+    "post_wise_eligibility", "faqs"
   ]);
   const allowed = [
     "notice_type", "overview", "department", "post_names",
     "total_vacancies", "eligibility", "educational_qualification",
     "age_limit", "age_relaxation", "salary", "application_fee",
-    "important_dates", "selection_process", "how_to_apply",
-    "documents_required", "official_links", "source_evidence"
+    "important_dates", "selection_process", "exam_pattern", "how_to_apply",
+    "documents_required", "official_links", "vacancy_breakdown",
+    "post_wise_eligibility", "faqs", "source_evidence"
   ];
 
   for (const key of allowed) {
@@ -1557,12 +1559,21 @@ ${notice.text.slice(0, 24000)}`;
   if (!details.important_dates || typeof details.important_dates !== "object" || Array.isArray(details.important_dates)) {
     details.important_dates = {};
   }
-  for (const dateKey of ["notification_date", "start_date", "last_date", "exam_date"]) {
+  for (const dateKey of ["notification_date", "start_date", "last_date", "exam_date", "fee_last_date", "correction_date", "admit_card_date", "result_date"]) {
     if (!(dateKey in details.important_dates) || details.important_dates[dateKey] == null) {
       details.important_dates[dateKey] = MISSING;
     }
   }
 
+  const normalizeRows = (value, fields) => Array.isArray(value)
+    ? value.filter(row => row && typeof row === "object" && !Array.isArray(row)).slice(0, 40).map(row =>
+        Object.fromEntries(fields.map(field => [field, clean(row[field] == null || row[field] === "" ? MISSING : String(row[field]), 700)]))
+      )
+    : [];
+  details.vacancy_breakdown = normalizeRows(details.vacancy_breakdown, ["category", "vacancies"]);
+  details.post_wise_eligibility = normalizeRows(details.post_wise_eligibility, ["post_name", "educational_qualification", "age_limit", "typing_requirement"]);
+  details.faqs = normalizeRows(details.faqs, ["question", "answer"]);
+  details.exam_pattern = Array.isArray(details.exam_pattern) ? details.exam_pattern.slice(0, 30).map(value => clean(String(value), 500)) : [];
   details.extraction_note = "AI-extracted from the linked official notice. Verify the original notification before applying.";
   return { details, sourceUrl: notice.finalUrl, isPdf: notice.isPdf };
 }
@@ -1707,7 +1718,7 @@ export default {
 
       if(detailMatch&&request.method==="GET"){
         const post=await env.DB.prepare(
-          "SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,created_at,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'"
+          "SELECT id,title,summary,category,source_name,source_url,published_at,application_last_date,date_checked_at,created_at,ai_details_json,ai_extraction_status,ai_extracted_at,ai_extraction_error FROM posts WHERE id=? AND status='published'"
         ).bind(Number(detailMatch[1])).first();
 
         if(!post){
