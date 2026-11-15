@@ -79,7 +79,7 @@ jobs:
           admin_js = (root / "admin.js").read_text(encoding="utf-8")
 
           assert 'limit:"20"' in app, "Homepage category previews must be capped at 20"
-          assert 'viewAll.hidden=Number(data.total||0)<=15' in app, "Homepage View All must only show when a category has more than 15 posts"
+          assert 'viewAll.style.display=Number(data.total||0)>15?"inline-flex":"none"' in app, "Homepage View All must only show when a category has more than 15 posts"
           assert "const limit=24" in category_js, "Category pages must paginate in groups of 24"
           assert 'addEventListener("click",()=>{offset+=limit;load(true);})' in category_js, "Load More pagination is missing"
           assert "const postHref=post=>" in app
