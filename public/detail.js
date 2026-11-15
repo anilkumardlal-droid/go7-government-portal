@@ -65,6 +65,15 @@
     admit_card_date:"Admit Card Date",result_date:"Result Date"
   };
   const section=(title,body,cls="")=>body?'<section class="go7-post-section '+cls+'"><h2>'+esc(title)+'</h2>'+body+'</section>':"";
+  const noticeMissing='<p class="go7-notice-missing">This detail is not mentioned in the official information currently available to GO7. Please check the original notification.</p>';
+  const requiredSection=(title,body,cls="")=>section(title,present(body)?body:noticeMissing,cls);
+  function renderDatesAndFee(d,p){
+    const dateContent=rowTable(d,p);
+    const feeContent=feeTable(d);
+    const datePanel='<div class="go7-required-panel"><h3>Important Dates</h3>'+(present(dateContent)?dateContent:noticeMissing)+'</div>';
+    const feePanel='<div class="go7-required-panel"><h3>Application Fee</h3>'+(present(feeContent)?feeContent:noticeMissing)+'</div>';
+    return section("Important Dates + Fee",'<div class="go7-required-two-panel">'+datePanel+feePanel+'</div>');
+  }
   function table(headers,rows,cls=""){
     const valid=(rows||[]).filter(row=>Array.isArray(row)&&row.some(present));
     if(!valid.length)return "";
@@ -161,15 +170,14 @@
     const overviewRemainder=overviewWords.slice(titleWords.length).join(" ");
     const shortTitleRepeat=startsWithFullTitle&&overviewRemainder.length<28;
     const showOverview=present(overview)&&normalizedOverview!==normalizedTitle&&!shortTitleRepeat&&normalizedOverview.length>Math.min(35,normalizedTitle.length);
-    const deadline=p.application_last_date||d.important_dates?.last_date;
-    const dates=rowTable(d,p);
-    const fee=feeTable(d);
-    const dateFee=(dates||fee)?'<div class="go7-two-column">'+(dates?section("Important Dates",dates,"go7-date-panel"):"")+(fee?section("Application Fee",fee,"go7-fee-panel"):"")+'</div>':"";
+    const datesAndFee=renderDatesAndFee(d,p);
     const topSummary=showOverview?section(recruitment?"Recruitment Overview":"Update Overview",paragraph(overview),"go7-overview-panel"):"";
-    const ageVacancyRows=[];
-    if(present(d.age_limit)||present(d.total_vacancies))ageVacancyRows.push([d.age_limit,d.total_vacancies]);
-    const ageVacancy=table(["Age Limit","Total Posts"],ageVacancyRows,"go7-highlight-table");
-    const ageVacancySection=ageVacancy?section(recruitment?"Age Limit & Total Vacancy":"Key Information",ageVacancy,"go7-highlight-section"):"";
+    const ageVacancyRows=[[
+      present(d.age_limit)?d.age_limit:"Not mentioned in official notification",
+      present(d.total_vacancies)?d.total_vacancies:"Not mentioned in official notification"
+    ]];
+    const ageVacancy=table(["Age Limit","Total Vacancy"],ageVacancyRows,"go7-highlight-table");
+    const ageVacancySection=requiredSection("Age Limit + Total Vacancy",ageVacancy,"go7-highlight-section");
     const eligibility=eligibilityTable(d);
     const vacancy=vacancyTable(d);
     const qualificationRows=[
@@ -183,21 +191,23 @@
     const exam=bullets(d.exam_pattern,false);
     const how=bullets(d.how_to_apply,true);
     const documents=bullets(d.documents_required,false);
+    const faq=renderFaq(d);
+    const importantLinks=renderLinks(p,d);
     const parts=[];
     parts.push(topSummary);
-    parts.push(dateFee);
+    parts.push(datesAndFee);
     parts.push(ageVacancySection);
-    parts.push(section("Vacancy Details",vacancy));
-    parts.push(section("Post-wise Eligibility Criteria",eligibility));
+    parts.push(requiredSection("Category-wise Vacancy",vacancy));
+    parts.push(requiredSection("Post-wise Eligibility",eligibility));
     parts.push(section("Eligibility & Other Details",qualification));
-    parts.push(section("How to Apply",how));
-    parts.push(section("Mode of Selection",selection));
+    parts.push(requiredSection("How to Apply",how));
+    parts.push(requiredSection("Selection Process",selection));
     parts.push(section("Exam Pattern / Skill Test",exam));
     parts.push(section("Documents Required",documents));
-    parts.push(section("Frequently Asked Questions",renderFaq(d)));
-    parts.push(section("Some Useful Important Links",renderLinks(p,d),"go7-links-section"));
+    parts.push(requiredSection("FAQ",faq));
+    parts.push(requiredSection("Important Links",importantLinks,"go7-links-section"));
     parts.push(section("Source & Verification",present(d.source_evidence)?'<p>'+esc(d.source_evidence)+'</p>':(present(p.date_checked_at)?'<p>Source details last checked on '+esc(dateText(p.date_checked_at))+'. Please confirm any subsequent changes with the issuing authority.</p>':'<p>For the latest and complete information, check the original publisher and issuing authority notice.</p>'),"go7-source-section"));
-    parts.push(section("Latest & Related Updates",renderRelatedShell(),"go7-related-section"));
+    parts.push(section("Latest / Related Posts",renderRelatedShell(),"go7-related-section"));
     const topShare=shareButtons(p,"top");
     const bottomShare=shareButtons(p,"bottom");
     const pageUrl="https://jobs.go7.in/detail.html?id="+encodeURIComponent(p.id);
