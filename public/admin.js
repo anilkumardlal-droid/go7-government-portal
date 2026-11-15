@@ -195,48 +195,103 @@ $("publishPost").onclick=async()=>{try{say("Publishing verified update…");cons
 
 $("loadHealth").onclick=async()=>{try{const d=await call("/api/admin/health");const rows=d.sources||[];$("health").innerHTML=rows.map(x=>`<div class="source-row"><b>${escapeHtml(x.source_name)}</b> · <strong>${escapeHtml(x.status)}</strong><br><small>Checked: ${escapeHtml(x.last_checked_at||"-")} · Last success: ${escapeHtml(x.last_success_at||"-")}</small>${x.last_error?`<br><span style="color:#b5121b">${escapeHtml(x.last_error)}</span>`:""}</div>`).join("")||"No source checks recorded yet. Run Sync RSS feeds first.";}catch(e){say(e.message);}};
 
-// Browser-side PDF parsing keeps large PDF processing out of the Worker CPU budget.
-const aiLoadButton = $("loadAiPosts");
-if (aiLoadButton) {
-  if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  aiLoadButton.onclick = async () => {
-    try {
-      const d = await call("/api/admin/ai/pending");
-      const items = d.items || [];
-      $("aiPosts").innerHTML = items.map(item => `<div class="source-row"><b>#${item.id} · ${escapeHtml(item.title)}</b><br><small>${escapeHtml(item.source_name || "")} · ${escapeHtml(item.ai_extraction_status || "pending")}</small><br><button type="button" class="secondary" data-ai-select="${item.id}">Select this post</button></div>`).join("") || "No published Jobs & Vacancies posts found.";
-      say(`Loaded ${items.length} Jobs & Vacancies posts.`);
-    } catch (e) { say("Could not load AI posts: " + e.message); }
+// Existing-post backfill reads only official public sources, one post per request.
+const aiLoadButton=$("loadAiPosts");
+const backfillButton=$("backfillOldPosts");
+async function loadAiQueue(){
+  const data=await call("/api/admin/ai/pending?limit=50&offset=0");
+  const items=data.items||[];
+  const counts=(data.counts_by_category||[]).map(x=>`${escapeHtml(x.category)}: ${Number(x.total)||0}`).join(" · ");
+  $("aiPosts").innerHTML=items.map(item=>`
+    <div class="source-row">
+      <b>#${item.id} · ${escapeHtml(item.title)}</b><br>
+      <small>${escapeHtml(item.category||"")} · ${escapeHtml(item.source_name||"")} · ${escapeHtml(item.ai_extraction_status||"pending")}</small>
+      ${item.ai_extraction_error?`<br><small style="color:#a3232e">${escapeHtml(item.ai_extraction_error)}</small>`:""}
+      <br><button type="button" class="secondary" data-ai-select="${item.id}">Select this post</button>
+    </div>`).join("")||"No posts are waiting for detail extraction.";
+  $("aiPosts").insertAdjacentHTML("afterbegin",`<p class="message">Pending details: <strong>${Number(data.total)||0}</strong>${counts?`<br><small>${counts}</small>`:""}</p>`);
+  return data;
+}
+if(aiLoadButton){
+  if(window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  aiLoadButton.onclick=async()=>{
+    try{
+      const data=await loadAiQueue();
+      say(`Loaded ${(data.items||[]).length} posts needing details across all categories. Total pending: ${data.total||0}.`);
+    }catch(error){say("Could not load posts: "+error.message);}
   };
-  $("aiPosts").addEventListener("click", event => {
-    const button = event.target.closest("[data-ai-select]");
-    if (!button) return;
-    $("aiPostId").value = button.getAttribute("data-ai-select");
-    $("aiStatus").textContent = `Post #${$("aiPostId").value} selected. Choose its official PDF.`;
+  $("aiPosts").addEventListener("click",event=>{
+    const button=event.target.closest("[data-ai-select]");
+    if(!button)return;
+    $("aiPostId").value=button.getAttribute("data-ai-select");
+    $("aiStatus").textContent=`Post #${$("aiPostId").value} selected. Choose its official PDF.`;
   });
-  $("runAiExtract").onclick = async () => {
-    const postId = $("aiPostId").value.trim();
-    const file = $("aiPdf").files?.[0];
-    const status = $("aiStatus");
-    if (!/^\d+$/.test(postId)) { status.textContent = "पहले सूची से एक पोस्ट चुनें।"; return; }
-    if (!file || (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf"))) { status.textContent = "कृपया official PDF file चुनें।"; return; }
-    if (file.size > 12 * 1024 * 1024) { status.textContent = "PDF अधिकतम 12 MB की होनी चाहिए।"; return; }
-    if (!window.pdfjsLib) { status.textContent = "PDF reader load नहीं हुआ। Internet connection जाँचें और page reload करें।"; return; }
-    try {
-      status.textContent = "PDF browser में पढ़ी जा रही है…";
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
-      if (pdf.numPages > 150) throw new Error("PDF में 150 से अधिक pages हैं। कृपया छोटी official notification PDF चुनें।");
-      let extracted = "";
-      for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-        const page = await pdf.getPage(pageNo);
-        const content = await page.getTextContent();
-        extracted += content.items.map(item => item.str || "").join(" ") + "\n";
-        if (extracted.length > 50000) { extracted = extracted.slice(0, 50000); break; }
+  $("runAiExtract").onclick=async()=>{
+    const postId=$("aiPostId").value.trim();
+    const file=$("aiPdf").files?.[0];
+    const status=$("aiStatus");
+    if(!/^\d+$/.test(postId)){status.textContent="पहले सूची से एक पोस्ट चुनें।";return;}
+    if(!file||(file.type!=="application/pdf"&&!file.name.toLowerCase().endsWith(".pdf"))){status.textContent="कृपया official PDF file चुनें।";return;}
+    if(file.size>12*1024*1024){status.textContent="PDF अधिकतम 12 MB की होनी चाहिए।";return;}
+    if(!window.pdfjsLib){status.textContent="PDF reader load नहीं हुआ। Internet connection जाँचें और page reload करें।";return;}
+    try{
+      status.textContent="PDF browser में पढ़ी जा रही है…";
+      const bytes=new Uint8Array(await file.arrayBuffer());
+      const pdf=await window.pdfjsLib.getDocument({data:bytes}).promise;
+      if(pdf.numPages>150)throw new Error("PDF में 150 से अधिक pages हैं। कृपया छोटी official notification PDF चुनें।");
+      let extracted="";
+      for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+        const page=await pdf.getPage(pageNo);
+        const content=await page.getTextContent();
+        extracted+=content.items.map(item=>item.str||"").join(" ")+"\n";
+        if(extracted.length>50000){extracted=extracted.slice(0,50000);break;}
       }
-      if (extracted.trim().length < 300) throw new Error("PDF में selectable text नहीं मिला। यह scanned PDF हो सकती है; OCR की जरूरत होगी।");
-      status.textContent = "PDF पढ़ ली गई। Cloudflare AI से जानकारी निकाली जा रही है…";
-      const result = await call(`/api/admin/posts/${postId}/extract-text`, "POST", { text: extracted, source_url: "" });
-      status.textContent = result.message || "AI extraction completed.";
-    } catch (e) { status.textContent = "Extraction failed: " + e.message; }
+      if(extracted.trim().length<300)throw new Error("PDF में selectable text नहीं मिला। यह scanned PDF हो सकती है; OCR की जरूरत होगी।");
+      status.textContent="PDF पढ़ ली गई। Cloudflare AI से जानकारी निकाली जा रही है…";
+      const result=await call(`/api/admin/posts/${postId}/extract-text`,"POST",{text:extracted,source_url:""});
+      status.textContent=result.message||"AI extraction completed.";
+    }catch(error){status.textContent="Extraction failed: "+error.message;}
+  };
+}
+if(backfillButton){
+  backfillButton.onclick=async()=>{
+    const status=$("backfillStatus");
+    backfillButton.disabled=true;
+    if(aiLoadButton)aiLoadButton.disabled=true;
+    let completed=0,failed=0,needsSource=0,already=0,processed=0;
+    try{
+      status.textContent="पुराने पोस्टों की सूची लोड हो रही है…";
+      const first=await call("/api/admin/ai/pending?limit=500&offset=0");
+      const total=Number(first.total)||0;
+      const posts=[...(first.items||[])];
+      for(let offset=500;offset<total;offset+=500){
+        const page=await call(`/api/admin/ai/pending?limit=500&offset=${offset}`);
+        posts.push(...(page.items||[]));
+      }
+      if(!posts.length){
+        status.textContent="सभी उपलब्ध पोस्टों के विवरण पहले से Extract हैं।";
+        await loadAiQueue();
+        return;
+      }
+      for(const post of posts){
+        processed++;
+        status.textContent=`पुरानी पोस्ट ${processed}/${posts.length} पढ़ी जा रही है: #${post.id} — ${post.title}`;
+        try{
+          const result=await call("/api/admin/ai/backfill-one","POST",{id:post.id});
+          if(result.status==="completed")completed++;
+          else if(result.status==="needs_official_source")needsSource++;
+          else if(result.status==="already_completed")already++;
+          else failed++;
+        }catch(error){failed++;}
+        status.textContent=`प्रगति: ${processed}/${posts.length} · विवरण तैयार: ${completed} · स्रोत लिंक चाहिए: ${needsSource} · विफल: ${failed}`;
+      }
+      status.textContent=`Backfill पूरा हुआ। कुल: ${processed} · विवरण तैयार: ${completed} · सरकारी स्रोत लिंक चाहिए: ${needsSource} · विफल: ${failed} · पहले से पूरे: ${already}।`;
+      await loadAiQueue();
+    }catch(error){
+      status.textContent="Backfill रुका: "+error.message+"। दोबारा शुरू करने पर शेष पोस्ट जारी रहेंगे।";
+    }finally{
+      backfillButton.disabled=false;
+      if(aiLoadButton)aiLoadButton.disabled=false;
+    }
   };
 }
